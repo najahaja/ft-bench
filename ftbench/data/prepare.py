@@ -36,7 +36,12 @@ def _parse_annot_utt(annot_utt: str) -> dict[str, str]:
 
 def build_label_vocab(dataset) -> dict:
     """Extract intent and slot type vocabularies from the MASSIVE dataset."""
-    intents = sorted(set(dataset["train"]["intent"]))
+    intent_feat = dataset["train"].features.get("intent")
+    if hasattr(intent_feat, "names") and intent_feat.names:
+        intents = sorted(intent_feat.names)
+    else:
+        intents = sorted(set(dataset["train"]["intent"]))
+
     all_annots = (
         list(dataset["train"]["annot_utt"])
         + list(dataset["validation"]["annot_utt"])
@@ -54,15 +59,31 @@ def load_massive(config: str = "en-US"):
     """Download MASSIVE from HF Hub, return DatasetDict with official splits."""
     from datasets import load_dataset
     print(f"[+] Downloading AmazonScience/massive ({config})...")
-    return load_dataset("AmazonScience/massive", config)
+    try:
+        return load_dataset("AmazonScience/massive", config)
+    except Exception as e:
+        print(f"[+] Direct script loading failed ({e}). Loading official HF parquet conversion...")
+        base_url = f"https://huggingface.co/datasets/AmazonScience/massive/resolve/refs%2Fconvert%2Fparquet/{config}"
+        return load_dataset(
+            "parquet",
+            data_files={
+                "train": f"{base_url}/train/0000.parquet",
+                "validation": f"{base_url}/validation/0000.parquet",
+                "test": f"{base_url}/test/0000.parquet",
+            },
+        )
 
 
-def _record_from_row(row: dict, split_name: str, idx: int) -> dict:
+def _record_from_row(row: dict, split_name: str, idx: int, intent_names: Optional[List[str]] = None) -> dict:
     """Convert a MASSIVE row to an FT-Bench record."""
     from ftbench.prompts.templates import build_inference_prompt
     utterance = row.get("utt", "")
     annot_utt = row.get("annot_utt", "")
-    intent = row.get("intent", "")
+    intent_val = row.get("intent", "")
+    if isinstance(intent_val, int) and intent_names and 0 <= intent_val < len(intent_names):
+        intent = intent_names[intent_val]
+    else:
+        intent = str(intent_val)
     slots = _parse_annot_utt(annot_utt)
     ground_truth = {"intent": intent, "slots": slots}
     prompt = build_inference_prompt(utterance)
@@ -126,10 +147,13 @@ def prepare(
     write_json(vocab, "configs/label_vocab.json")
     print(f"[+] Vocabulary: {len(vocab['intents'])} intents, {len(vocab['slots'])} slot types")
 
+    intent_feat = dataset["train"].features.get("intent")
+    intent_names = intent_feat.names if hasattr(intent_feat, "names") else None
+
     # Convert splits
-    train_records = [_record_from_row(row, "train", i) for i, row in enumerate(dataset["train"])]
-    val_records   = [_record_from_row(row, "val",   i) for i, row in enumerate(dataset["validation"])]
-    test_records  = [_record_from_row(row, "test",  i) for i, row in enumerate(dataset["test"])]
+    train_records = [_record_from_row(row, "train", i, intent_names) for i, row in enumerate(dataset["train"])]
+    val_records   = [_record_from_row(row, "val",   i, intent_names) for i, row in enumerate(dataset["validation"])]
+    test_records  = [_record_from_row(row, "test",  i, intent_names) for i, row in enumerate(dataset["test"])]
 
     # Leakage check
     train_records, n_leaked = _check_leakage(train_records, val_records, test_records)

@@ -3,7 +3,7 @@ import json
 import pytest
 from ftbench.data.schema import extract_json_block, validate_output
 
-VALID = {"intent": "weather_query", "slots": {"city": "tokyo"}}
+VALID = {"intent": "weather_query", "slots": {"place_name": "tokyo"}}
 
 
 def test_extract_raw_json():
@@ -27,7 +27,7 @@ def test_validate_valid():
     ok, model, err = validate_output(json.dumps(VALID))
     assert ok is True
     assert model.intent == "weather_query"
-    assert model.slots == {"city": "tokyo"}
+    assert model.slots == {"place_name": "tokyo"}
 
 
 def test_validate_empty_slots():
@@ -37,7 +37,7 @@ def test_validate_empty_slots():
 
 
 def test_validate_missing_intent():
-    d = {"slots": {"city": "london"}}
+    d = {"slots": {"place_name": "london"}}
     ok, model, err = validate_output(json.dumps(d))
     assert ok is False
 
