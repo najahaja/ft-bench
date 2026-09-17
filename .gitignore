@@ -1,0 +1,10 @@
+\\\\wsl.localhost
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+data/train.jsonl
+data/val.jsonl
+data/test.jsonl
+.env

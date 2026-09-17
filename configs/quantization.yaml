@@ -1,0 +1,9 @@
+quantization:
+  merged_model_path: models/finetuned-merged
+  output_path: models/finetuned-awq-4bit
+  calibration_dataset: data/train.jsonl
+  n_calibration_samples: 512
+  w_bit: 4
+  q_group_size: 128
+  max_seq_length: 512
+  # Uses llm-compressor (NOT autoawq)

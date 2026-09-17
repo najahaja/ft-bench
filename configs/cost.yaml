@@ -1,0 +1,12 @@
+cost:
+  gpu_instance: RTX_A4000_RunPod
+  gpu_cost_per_hour_usd: 0.44
+  api_costs:
+    gpt_4o_mini:
+      input_per_million_tokens: 0.15
+      output_per_million_tokens: 0.6
+    claude_3_haiku:
+      input_per_million_tokens: 0.25
+      output_per_million_tokens: 1.25
+  avg_output_tokens: 112
+  avg_requests_per_hour_at_p50_concurrency: 3600

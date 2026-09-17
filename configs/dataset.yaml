@@ -1,0 +1,7 @@
+dataset:
+  name: AmazonScience/massive
+  config: en-US
+  # Use official splits; do NOT set custom train_frac/val_frac.
+  output_dir: data
+  prompt_format: apply_chat_template  # tokenizer.apply_chat_template() only
+  seed: 42

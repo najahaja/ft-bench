@@ -1,0 +1,1 @@
+{"id": "golden_placeholder_001", "text": "I need to cancel my order and get a refund.", "ground_truth": {"intent": "cancel_order", "category": "ORDER", "sentiment": "neutral", "priority": "medium", "escalate": false, "summary": "Customer requesting order cancellation and refund."}, "formatted_text": "(run scripts/prepare_dataset.py to populate this file)"}

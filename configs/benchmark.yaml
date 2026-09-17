@@ -1,0 +1,10 @@
+benchmark:
+  target_url: http://127.0.0.1:8000
+  concurrency_levels: [1, 2, 4, 8, 16]
+  repetitions_per_level: 3
+  warmup_requests: 20
+  requests_per_level: 100
+  run_time_per_level: 30s
+  headless: true
+  report_dir: load_testing/reports
+  timeout_s: 30

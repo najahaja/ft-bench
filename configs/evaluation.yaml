@@ -1,0 +1,11 @@
+evaluation:
+  test_file: data/test.jsonl
+  golden_file: eval/golden/golden_100.jsonl
+  results_dir: eval/results
+  batch_size: 1
+  max_new_tokens: 256
+  temperature: 0.1
+  few_shot_file: configs/fewshot_exemplars.json
+  bootstrap_n: 1000
+  ci: 0.95
+  seed: 42
