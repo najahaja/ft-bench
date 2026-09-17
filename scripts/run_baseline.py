@@ -61,9 +61,9 @@ def main():
     else:
         from transformers import AutoTokenizer, pipeline
         import torch
-        with open("configs/training.yaml") as f:
-            t_cfg = yaml.safe_load(f)
-        model_id = t_cfg["model"]["base_model_id"]
+        with open("configs/serving.yaml") as f:
+            s_cfg = yaml.safe_load(f)
+        model_id = s_cfg["serving"]["models"]["base"]["id"]
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         pipe = pipeline(
             "text-generation", model=model_id, tokenizer=tokenizer,

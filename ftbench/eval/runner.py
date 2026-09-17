@@ -21,9 +21,9 @@ def run_eval(
 ) -> List[Dict[str, Any]]:
     results = []
     for i, sample in enumerate(samples):
-        text = sample["text"]
+        text = sample["utterance"]
         gt = sample["ground_truth"]
-        prompt = build_inference_prompt(text, few_shot_examples)
+        prompt = sample.get("prompt") or build_inference_prompt(text)
 
         t0 = time.perf_counter()
         raw_output = generate_fn(prompt)
@@ -39,7 +39,7 @@ def run_eval(
         record = {
             "id": sample.get("id", str(i)),
             "system": system_name,
-            "text": text,
+            "utterance": text,
             "ground_truth": gt,
             "raw_output": raw_output,
             "parsed": parsed_dict,
