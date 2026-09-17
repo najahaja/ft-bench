@@ -55,17 +55,17 @@ def _mock_generate(utterance: str, system: str) -> Tuple[str, float, int]:
 
 
 async def route_request(
-    ticket_text: str,
+    utterance: str,
     system: str = "awq",
     temperature: float = 0.1,
     max_new_tokens: int = 256,
     use_mock: bool = False,
 ) -> Dict:
-    prompt = build_inference_prompt(ticket_text)
+    prompt = build_inference_prompt(utterance)
     use_mock_actual = use_mock or os.environ.get("USE_MOCK", "false").lower() == "true"
 
     if use_mock_actual:
-        raw_output, latency_ms, tokens = _mock_generate(ticket_text, system)
+        raw_output, latency_ms, tokens = _mock_generate(utterance, system)
     else:
         try:
             import httpx
@@ -83,7 +83,7 @@ async def route_request(
             raw_output = data["choices"][0]["text"]
             tokens = data["usage"]["completion_tokens"]
         except Exception:
-            raw_output, latency_ms, tokens = _mock_generate(ticket_text, system)
+            raw_output, latency_ms, tokens = _mock_generate(utterance, system)
 
     json_ok, parsed_dict, parse_error = parse_output(raw_output)
     schema_ok = False

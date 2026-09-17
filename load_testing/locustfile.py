@@ -2,7 +2,7 @@
 import random
 from locust import HttpUser, task, between
 
-SAMPLE_TICKETS = [
+SAMPLE_UTTERANCES = [
     "I need to cancel my order #ORD-12345 placed yesterday.",
     "Where is my refund? I returned the product 12 days ago.",
     "I cannot log in - my password reset email never arrived.",
@@ -20,7 +20,7 @@ class LLMGatewayUser(HttpUser):
     @task(4)
     def generate_awq(self):
         payload = {
-            "ticket_text": random.choice(SAMPLE_TICKETS),
+            "utterance": random.choice(SAMPLE_UTTERANCES),
             "system": "awq",
             "temperature": 0.1,
             "max_new_tokens": 256,
@@ -34,7 +34,7 @@ class LLMGatewayUser(HttpUser):
     @task(1)
     def generate_base(self):
         payload = {
-            "ticket_text": random.choice(SAMPLE_TICKETS),
+            "utterance": random.choice(SAMPLE_UTTERANCES),
             "system": "base",
         }
         self.client.post("/generate", json=payload)

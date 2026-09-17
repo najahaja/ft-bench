@@ -13,7 +13,7 @@ class InferenceLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(Float, default=time.time)
     system = Column(String, index=True)
-    ticket_text = Column(Text)
+    utterance = Column(Text)
     raw_output = Column(Text)
     is_json_valid = Column(Boolean, default=False)
     is_schema_valid = Column(Boolean, default=False)
@@ -26,12 +26,12 @@ class InferenceLog(Base):
 Base.metadata.create_all(bind=engine)
 
 
-def log_request(system, ticket_text, raw_output, is_json_valid, is_schema_valid,
+def log_request(system, utterance, raw_output, is_json_valid, is_schema_valid,
                 latency_ms, tokens_generated, throughput_tok_s, parse_error=None):
     db = SessionLocal()
     try:
         record = InferenceLog(
-            timestamp=time.time(), system=system, ticket_text=ticket_text,
+            timestamp=time.time(), system=system, utterance=utterance,
             raw_output=raw_output, is_json_valid=is_json_valid,
             is_schema_valid=is_schema_valid, latency_ms=latency_ms,
             tokens_generated=tokens_generated, throughput_tok_s=throughput_tok_s,
@@ -48,7 +48,7 @@ def get_recent_logs(limit: int = 50) -> list:
     try:
         rows = db.query(InferenceLog).order_by(InferenceLog.id.desc()).limit(limit).all()
         return [
-            {"id": r.id, "system": r.system, "ticket_text": r.ticket_text,
+            {"id": r.id, "system": r.system, "utterance": r.utterance,
              "is_json_valid": r.is_json_valid, "is_schema_valid": r.is_schema_valid,
              "latency_ms": r.latency_ms, "throughput_tok_s": r.throughput_tok_s,
              "timestamp": r.timestamp}

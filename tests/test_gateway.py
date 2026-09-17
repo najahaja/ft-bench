@@ -22,7 +22,7 @@ def test_models():
 
 
 def test_generate_base():
-    resp = client.post("/generate", json={"ticket_text": "Cancel my order #12345", "system": "base"})
+    resp = client.post("/generate", json={"utterance": "Cancel my order #12345", "system": "base"})
     assert resp.status_code == 200
     data = resp.json()
     assert "latency_ms" in data
@@ -30,13 +30,13 @@ def test_generate_base():
 
 
 def test_generate_awq():
-    resp = client.post("/generate", json={"ticket_text": "My refund has not arrived!", "system": "awq"})
+    resp = client.post("/generate", json={"utterance": "My refund has not arrived!", "system": "awq"})
     assert resp.status_code == 200
     assert resp.json()["is_json_valid"] is True
 
 
 def test_metrics_endpoint():
-    client.post("/generate", json={"ticket_text": "test", "system": "awq"})
+    client.post("/generate", json={"utterance": "test", "system": "awq"})
     resp = client.get("/metrics")
     assert resp.status_code == 200
     assert b"ftbench_requests_total" in resp.content

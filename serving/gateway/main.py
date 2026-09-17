@@ -48,7 +48,7 @@ async def generate(req: GenerateRequest):
     t0 = time.perf_counter()
     try:
         result = await route_request(
-            ticket_text=req.ticket_text,
+            utterance=req.utterance,
             system=req.system,
             temperature=req.temperature,
             max_new_tokens=req.max_new_tokens,
@@ -59,7 +59,7 @@ async def generate(req: GenerateRequest):
         TOKENS_OUT.labels(system=req.system).inc(result["tokens_generated"])
 
         log_request(
-            system=result["system"], ticket_text=req.ticket_text,
+            system=result["system"], utterance=req.utterance,
             raw_output=result["raw_output"], is_json_valid=result["is_json_valid"],
             is_schema_valid=result["is_schema_valid"], latency_ms=result["latency_ms"],
             tokens_generated=result["tokens_generated"], throughput_tok_s=result["throughput_tok_s"],
