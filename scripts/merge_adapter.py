@@ -53,6 +53,7 @@ def main():
     parser.add_argument("--adapter-path", required=True, help="Path to trained LoRA adapter directory")
     parser.add_argument("--output-dir", default="models/finetuned", help="Target directory for merged model")
     parser.add_argument("--hub-repo-id", default=None, help="Optional HF repo ID to push merged model")
+    parser.add_argument("--hf-token", default=None, help="Hugging Face token")
     args = parser.parse_args()
 
     merge_and_save(
@@ -60,6 +61,7 @@ def main():
         adapter_path=args.adapter_path,
         output_dir=args.output_dir,
         hub_repo_id=args.hub_repo_id,
+        hf_token=args.hf_token,
     )
 
 

@@ -145,6 +145,7 @@ def main():
     parser = argparse.ArgumentParser(description="FT-Bench Phase 5: QLoRA Fine-Tuning")
     parser.add_argument("--config", default="configs/training.yaml")
     parser.add_argument("--hub-repo-id", default=None, help="Override Hub repo ID")
+    parser.add_argument("--hf-token", default=None, help="Hugging Face access token")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint if exists")
     args = parser.parse_args()
 
@@ -164,7 +165,22 @@ def main():
 
     seed_everything(t_cfg.get("seed", 42))
 
-    hf_token = os.environ.get("HF_TOKEN")
+    hf_token = (
+        args.hf_token
+        or os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    )
+    if not hf_token:
+        try:
+            from huggingface_hub import get_token
+            hf_token = get_token()
+        except Exception:
+            pass
+
+    if not hf_token:
+        print("[!] ERROR: No Hugging Face token detected! Pass --hf-token or set HF_TOKEN environment variable.")
+    else:
+        print(f"[+] Hugging Face token detected: {hf_token[:4]}...{hf_token[-4:]}")
     hub_repo_id = args.hub_repo_id or os.environ.get("HF_REPO_ID") or c_cfg.get("hub_repo_id")
     if hub_repo_id and "${" in hub_repo_id:
         hub_repo_id = os.environ.get("HF_REPO_ID", None)
