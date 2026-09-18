@@ -296,21 +296,36 @@ def main():
         hub_token=hf_token if push_to_hub else None,
     )
 
+    import inspect
+    max_len = t_cfg.get("max_seq_len", 640)
+
     if SFTConfig is not None:
-        sft_config = SFTConfig(
-            max_seq_length=t_cfg.get("max_seq_len", 640),
-            dataset_text_field="text",
-            **training_kwargs
-        )
-        trainer = SFTTrainer(
-            model=model,
-            args=sft_config,
-            train_dataset=train_dataset,
-            eval_dataset=val_dataset,
-            data_collator=collator,
-            tokenizer=tokenizer,
-            callbacks=[WandbGPUMonitorCallback(use_wandb=use_wandb)],
-        )
+        sft_init_params = inspect.signature(SFTConfig.__init__).parameters
+        if "max_length" in sft_init_params:
+            training_kwargs["max_length"] = max_len
+        elif "max_seq_length" in sft_init_params:
+            training_kwargs["max_seq_length"] = max_len
+
+        if "dataset_text_field" in sft_init_params:
+            training_kwargs["dataset_text_field"] = "text"
+
+        sft_config = SFTConfig(**training_kwargs)
+
+        trainer_params = inspect.signature(SFTTrainer.__init__).parameters
+        trainer_kwargs = {
+            "model": model,
+            "args": sft_config,
+            "train_dataset": train_dataset,
+            "eval_dataset": val_dataset,
+            "data_collator": collator,
+            "callbacks": [WandbGPUMonitorCallback(use_wandb=use_wandb)],
+        }
+        if "processing_class" in trainer_params:
+            trainer_kwargs["processing_class"] = tokenizer
+        else:
+            trainer_kwargs["tokenizer"] = tokenizer
+
+        trainer = SFTTrainer(**trainer_kwargs)
     else:
         train_args = TrainingArguments(**training_kwargs)
         trainer = SFTTrainer(
@@ -319,7 +334,7 @@ def main():
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             dataset_text_field="text",
-            max_seq_length=t_cfg.get("max_seq_len", 640),
+            max_seq_length=max_len,
             data_collator=collator,
             tokenizer=tokenizer,
             callbacks=[WandbGPUMonitorCallback(use_wandb=use_wandb)],
