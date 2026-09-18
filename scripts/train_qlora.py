@@ -209,12 +209,21 @@ def main():
     tokenizer.padding_side = "right"
 
     # 2. Dataset preparation
+    train_path = d_cfg.get("train_path", "data/train.jsonl")
+    val_path = d_cfg.get("val_path", "data/val.jsonl")
+
+    if not os.path.exists(train_path) or not os.path.exists(val_path):
+        print(f"[!] Data files not found at {train_path}. Running prepare_dataset automatically...")
+        from ftbench.data.prepare import prepare
+        prepare(output_dir="data", config="en-US", seed=t_cfg.get("seed", 42))
+        print("[✓] MASSIVE dataset prepared successfully.")
+
     vocab_path = "configs/label_vocab.json"
     with open(vocab_path) as f:
         label_vocab = json.load(f)
 
     print(f"[+] Formatting datasets using canonical build_training_prompt()...")
-    train_dataset = prepare_hf_dataset(d_cfg.get("train_path", "data/train.jsonl"), tokenizer, label_vocab)
+    train_dataset = prepare_hf_dataset(train_path, tokenizer, label_vocab)
     val_dataset = prepare_hf_dataset(d_cfg.get("val_path", "data/val.jsonl"), tokenizer, label_vocab)
     print(f"[+] Train dataset: {len(train_dataset)} examples | Val dataset: {len(val_dataset)} examples")
 
