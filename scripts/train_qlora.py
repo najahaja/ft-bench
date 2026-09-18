@@ -30,6 +30,13 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer
 
+# Workaround for upstream TRL bug where _patch_chunked_ce_lm_head crashes on functools.partial
+try:
+    import trl.trainer.sft_trainer
+    trl.trainer.sft_trainer._patch_chunked_ce_lm_head = lambda *args, **kwargs: None
+except Exception:
+    pass
+
 try:
     from trl import DataCollatorForCompletionOnlyLM
 except ImportError:
