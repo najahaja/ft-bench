@@ -37,32 +37,35 @@ try:
 except Exception:
     pass
 
-try:
-    from trl import DataCollatorForCompletionOnlyLM
-except ImportError:
-    try:
-        from trl.trainer.utils import DataCollatorForCompletionOnlyLM
-    except ImportError:
-        class DataCollatorForCompletionOnlyLM(DataCollatorForLanguageModeling):
-            """Self-contained completion-only loss collator for trl >= 0.20."""
-            def __init__(self, response_template, tokenizer, mlm=False, ignore_index=-100):
-                super().__init__(tokenizer=tokenizer, mlm=mlm)
-                if isinstance(response_template, str):
-                    self.response_token_ids = tokenizer.encode(response_template, add_special_tokens=False)
-                else:
-                    self.response_token_ids = response_template
-                self.ignore_index = ignore_index
+from transformers import DataCollatorForSeq2Seq
 
-            def torch_call(self, examples):
-                batch = super().torch_call(examples)
-                for i in range(len(examples)):
-                    labels = batch["labels"][i]
-                    r_len = len(self.response_token_ids)
-                    for j in range(len(labels) - r_len + 1):
-                        if labels[j : j + r_len].tolist() == self.response_token_ids:
-                            labels[: j + r_len] = self.ignore_index
-                            break
-                return batch
+class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
+    """
+    Robust completion-only loss collator.
+    Inherits from DataCollatorForSeq2Seq to properly pad variable-length
+    input_ids with pad_token_id and labels with -100.
+    """
+    def __init__(self, response_template, tokenizer, ignore_index=-100):
+        super().__init__(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8, return_tensors="pt")
+        if isinstance(response_template, str):
+            self.response_token_ids = tokenizer.encode(response_template, add_special_tokens=False)
+        else:
+            self.response_token_ids = response_template
+        self.ignore_index = ignore_index
+
+    def torch_call(self, examples):
+        for ex in examples:
+            if "labels" not in ex:
+                ex["labels"] = list(ex["input_ids"])
+        batch = super().torch_call(examples)
+        for i in range(len(examples)):
+            labels = batch["labels"][i]
+            r_len = len(self.response_token_ids)
+            for j in range(len(labels) - r_len + 1):
+                if labels[j : j + r_len].tolist() == self.response_token_ids:
+                    labels[: j + r_len] = self.ignore_index
+                    break
+        return batch
 
 try:
     from trl import SFTConfig
@@ -266,7 +269,7 @@ def main():
 
     # 5. Data Collator for Completion-Only Loss Masking
     response_template = "<|start_header_id|>assistant<|end_header_id|>\n\n"
-    collator = DataCollatorForCompletionOnlyLM(
+    collator = CompletionOnlyDataCollator(
         response_template=response_template,
         tokenizer=tokenizer,
     )
@@ -284,7 +287,7 @@ def main():
         gradient_accumulation_steps=t_cfg.get("gradient_accumulation_steps", 4),
         learning_rate=float(t_cfg.get("learning_rate", 2e-4)),
         lr_scheduler_type=t_cfg.get("lr_scheduler_type", "cosine"),
-        warmup_ratio=float(t_cfg.get("warmup_ratio", 0.03)),
+        warmup_steps=max(1, int((len(train_dataset) // (t_cfg.get("per_device_train_batch_size", 4) * t_cfg.get("gradient_accumulation_steps", 4))) * t_cfg.get("num_train_epochs", 3) * float(t_cfg.get("warmup_ratio", 0.03)))),
         weight_decay=float(t_cfg.get("weight_decay", 0.01)),
         max_grad_norm=float(t_cfg.get("max_grad_norm", 0.3)),
         fp16=t_cfg.get("fp16", True),
@@ -388,6 +391,15 @@ def main():
 
     # 11. Produce merged FP16 model
     merged_output_dir = "models/finetuned"
+    print(f"[+] Freeing training VRAM before merging weights...")
+    del trainer
+    del model
+    del base_model
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     print(f"[+] Merging adapter into base model (FP16)...")
     try:
         merge_and_save(
