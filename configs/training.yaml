@@ -1,0 +1,83 @@
+# configs/training.yaml
+# Phase 5 — QLoRA fine-tuning, System B
+# Every value here is chosen deliberately. See inline comments for the "why" —
+# you should be able to explain each of these in an interview without notes.
+
+model:
+  base_model: "meta-llama/Llama-3.2-3B-Instruct"
+  load_in_4bit: true          # QLoRA: base weights stay 4-bit (NF4), only adapters train
+  bnb_4bit_quant_type: "nf4"  # NormalFloat4 — better weight-distribution fit than plain int4
+  bnb_4bit_compute_dtype: "float16"   # NOT bfloat16 — T4 (Turing, SM 7.5) has no bf16 support
+  bnb_4bit_use_double_quant: true      # quantizes the quantization constants too — small extra memory saving, ~free on quality
+
+lora:
+  r: 16                # rank — capacity of the adapter. 16 is a well-tested middle ground for
+                        # 3B-class models on a narrow task; higher ranks mostly help on broad,
+                        # multi-task fine-tuning, which this isn't
+  lora_alpha: 32        # alpha/r = 2.0 scaling — the conventional "2x rank" starting point;
+                        # revisit only if training loss plateaus unusually high
+  lora_dropout: 0.05    # light regularization — dataset is ~11.5k examples, small enough that
+                        # some dropout guards against overfitting a 60-way label space
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+    # ALL linear projections, not just attention (q/k/v/o). Rationale: this task's
+    # failure mode is FORMAT adherence (schema-valid JSON, exact label strings), which
+    # depends heavily on the MLP block's ability to reshape output distributions —
+    # restricting to attention-only projections is the standard choice for style/tone
+    # adaptation, not for the strict-format generation this task requires.
+  bias: "none"          # standard for LoRA — bias terms are cheap to include but rarely help
+
+training:
+  seed: 42                       # matches the global seed in docs/01-experiment-design.md §9
+  num_train_epochs: 3            # dataset is small (11,481 examples); 3 passes is enough to
+                                  # learn label-vocabulary adherence without epoch count
+                                  # itself becoming an unjustified knob — monitor val loss
+                                  # per epoch and stop early if it starts rising (Phase 5 will
+                                  # report whichever epoch's checkpoint had the best val loss,
+                                  # not necessarily the final one)
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4  # effective batch size 16 — sized to fit T4's 16GB alongside
+                                   # the 4-bit base weights + LoRA adapter + activations at
+                                   # max_seq_len below; NOT chosen for a "nice round number"
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03              # ~3% of steps spent ramping LR up — standard for LoRA
+                                   # fine-tuning; prevents the first few high-LR steps from
+                                   # destabilizing the 4-bit base's frozen representations
+  weight_decay: 0.01              # light L2 regularization on the trainable LoRA params only
+                                   # (base weights are frozen and 4-bit, decay doesn't apply there)
+  max_grad_norm: 0.3              # gradient clipping — QLoRA training is known to occasionally
+                                   # spike gradients in fp16; this is the commonly cited safe value
+  fp16: true                      # NOT bf16 — T4 constraint, see model.bnb_4bit_compute_dtype above
+  max_seq_len: 640                # covers prompt (system + utterance) + target JSON with margin;
+                                   # measured empirically: min=534, mean=547, p95=564, p99=575, max=631.
+                                   # 640 covers 100% of samples without target truncation, fitting in T4 VRAM.
+  logging_steps: 10
+  eval_strategy: "epoch"          # validation loss checked once per epoch (not per-step — the
+                                   # val set is only 2,033 examples, per-step eval would slow
+                                   # training for no real signal gain)
+  save_strategy: "epoch"
+  load_best_model_at_end: true    # select checkpoint by best val loss, not just "last"
+  metric_for_best_model: "eval_loss"
+  report_to: "wandb"
+  run_name: "ftbench-qlora-llama3.2-3b-massive"
+
+checkpointing:
+  output_dir: "/kaggle/working/checkpoints"
+  push_to_hub_every_epoch: true   # Kaggle sessions can die; push each epoch checkpoint to
+                                   # HF Hub immediately so a killed session loses at most one
+                                   # epoch of progress, not the whole run
+  hub_repo_id: "${HF_REPO_ID}"    # from .env — never hard-code a personal repo path in git
+
+data:
+  train_path: "data/train.jsonl"
+  val_path: "data/val.jsonl"
+  # both must already be formatted via ftbench.prompts.templates using
+  # tokenizer.apply_chat_template() — training must never re-implement prompt
+  # construction separately from what Phase 4 (baseline) and Phase 6 (eval) use

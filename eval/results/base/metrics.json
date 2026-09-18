@@ -17,5 +17,7 @@
         "point": 40.92,
         "lower": 39.11,
         "upper": 42.701
-    }
+    },
+    "latency_source": "unbatched_hf_pipeline_quality_run_only",
+    "latency_note": "Quality-eval artifact only (unbatched HF pipeline on T4x2). Benchmark latency/throughput must be measured via vLLM on single T4 in Phase 7."
 }
