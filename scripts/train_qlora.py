@@ -23,11 +23,39 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    DataCollatorForLanguageModeling,
     TrainerCallback,
     TrainingArguments,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
+from trl import SFTTrainer
+
+try:
+    from trl import DataCollatorForCompletionOnlyLM
+except ImportError:
+    try:
+        from trl.trainer.utils import DataCollatorForCompletionOnlyLM
+    except ImportError:
+        class DataCollatorForCompletionOnlyLM(DataCollatorForLanguageModeling):
+            """Self-contained completion-only loss collator for trl >= 0.20."""
+            def __init__(self, response_template, tokenizer, mlm=False, ignore_index=-100):
+                super().__init__(tokenizer=tokenizer, mlm=mlm)
+                if isinstance(response_template, str):
+                    self.response_token_ids = tokenizer.encode(response_template, add_special_tokens=False)
+                else:
+                    self.response_token_ids = response_template
+                self.ignore_index = ignore_index
+
+            def torch_call(self, examples):
+                batch = super().torch_call(examples)
+                for i in range(len(examples)):
+                    labels = batch["labels"][i]
+                    r_len = len(self.response_token_ids)
+                    for j in range(len(labels) - r_len + 1):
+                        if labels[j : j + r_len].tolist() == self.response_token_ids:
+                            labels[: j + r_len] = self.ignore_index
+                            break
+                return batch
 
 try:
     from trl import SFTConfig
@@ -205,7 +233,6 @@ def main():
     model.print_trainable_parameters()
 
     # 5. Data Collator for Completion-Only Loss Masking
-    # Llama 3.2 assistant turn format
     response_template = "<|start_header_id|>assistant<|end_header_id|>\n\n"
     collator = DataCollatorForCompletionOnlyLM(
         response_template=response_template,
