@@ -1,0 +1,31 @@
+# Phase 5 QLoRA fine-tuning dependencies
+# Install with: pip install -r requirements-dev.txt
+#
+# Version pins are chosen to match the Kaggle T4 GPU environment as of 2026-09.
+# Do NOT change torch/transformers/peft/trl versions independently — they must
+# be tested together since bitsandbytes ABI breaks frequently across versions.
+
+# Core ML stack
+torch==2.4.1
+transformers==4.46.3
+datasets==3.1.0
+accelerate==1.1.1
+
+# QLoRA / PEFT
+peft==0.13.2
+bitsandbytes==0.44.1
+
+# Supervised fine-tuning trainer
+trl==0.12.1
+
+# HF Hub
+huggingface_hub==0.26.2
+
+# Weights & Biases
+wandb==0.18.5
+
+# YAML config parsing (stdlib yaml is fine but this is faster)
+# pyyaml is already included transitively via transformers
+
+# Project package (editable install)
+-e .

@@ -44,6 +44,21 @@ class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
     Robust completion-only loss collator.
     Inherits from DataCollatorForSeq2Seq to properly pad variable-length
     input_ids with pad_token_id and labels with -100.
+
+    LABEL MASKING ANALYSIS (see task §5 — eos_token_id == pad_token_id == 128009):
+    Masking is purely position-based: we find the response_template token
+    sequence (<|start_header_id|>assistant<|end_header_id|>\n\n) and set
+    label = -100 for every position BEFORE and INCLUDING that delimiter.
+    Only the assistant completion tokens carry non-(-100) labels and incur loss.
+
+    We do NOT mask by token ID. The parent DataCollatorForSeq2Seq pads labels
+    with -100 automatically for padding positions. Therefore, even though
+    eos_token_id == pad_token_id == 128009 on Llama-3.2, an <eos> token that
+    appears INSIDE the assistant completion is NOT masked — it contributes to
+    the loss, which is correct. Only physically padded positions are -100.
+
+    Before (original): no explicit comment; risk of confusion about pad/eos masking.
+    After (this version): masking is template-position-based, safe with shared IDs.
     """
     def __init__(self, response_template, tokenizer, ignore_index=-100):
         super().__init__(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8, return_tensors="pt")
@@ -77,6 +92,66 @@ from ftbench.common.io import read_jsonl, write_json
 from ftbench.common.seed import seed_everything
 from ftbench.prompts.templates import build_training_prompt
 from scripts.merge_adapter import merge_and_save
+
+
+
+def resolve_hf_token() -> str:
+    """
+    Resolve HF token without ever accepting it as a CLI argument.
+
+    Priority:
+      1. Kaggle Secrets manager (when running on Kaggle)
+      2. HF_TOKEN / HUGGING_FACE_HUB_TOKEN environment variables
+      3. huggingface_hub cached login (interactive / CI sessions)
+
+    SECURITY: The --hf-token CLI argument has been REMOVED.
+    Passing tokens via CLI leaks them into shell history and Kaggle cell output.
+    """
+    # 1. Kaggle Secrets (preferred on Kaggle notebooks)
+    try:
+        from kaggle_secrets import UserSecretsClient
+        token = UserSecretsClient().get_secret("HF_TOKEN")
+        if token:
+            print("[+] HF token resolved from Kaggle Secrets.")
+            return token
+    except Exception:
+        pass
+
+    # 2. Environment variables (set by .env loader or `export HF_TOKEN=...`)
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        print("[+] HF token resolved from environment variable.")
+        return token
+
+    # 3. huggingface_hub cached credential (`huggingface-cli login`)
+    try:
+        from huggingface_hub import get_token
+        token = get_token()
+        if token:
+            print("[+] HF token resolved from huggingface_hub cached login.")
+            return token
+    except Exception:
+        pass
+
+    return None
+
+
+def resolve_hub_checkpoint(hub_repo_id: str, hf_token: str) -> bool:
+    """
+    Return True if the HF Hub repo already has files from a prior run.
+    Used to detect whether a killed Kaggle session pushed at least one epoch.
+    """
+    if not hub_repo_id:
+        return False
+    try:
+        from huggingface_hub import list_repo_files
+        files = list(list_repo_files(hub_repo_id, token=hf_token))
+        if files:
+            print(f"[+] HF Hub repo '{hub_repo_id}' has {len(files)} file(s) — prior run detected.")
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def load_env_vars():
@@ -155,7 +230,10 @@ def main():
     parser = argparse.ArgumentParser(description="FT-Bench Phase 5: QLoRA Fine-Tuning")
     parser.add_argument("--config", default="configs/training.yaml")
     parser.add_argument("--hub-repo-id", default=None, help="Override Hub repo ID")
-    parser.add_argument("--hf-token", default=None, help="Hugging Face access token")
+    # NOTE: --hf-token has been INTENTIONALLY REMOVED.
+    # Passing tokens via CLI leaks them into shell history and Kaggle cell output.
+    # Use Kaggle Secrets (HF_TOKEN secret) or the HF_TOKEN environment variable.
+    # See resolve_hf_token() above.
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint if exists")
     args = parser.parse_args()
 
@@ -175,22 +253,20 @@ def main():
 
     seed_everything(t_cfg.get("seed", 42))
 
-    hf_token = (
-        args.hf_token
-        or os.environ.get("HF_TOKEN")
-        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    )
+    # ── Security: resolve HF token from Kaggle Secrets / env only ────────────
+    hf_token = resolve_hf_token()
     if not hf_token:
-        try:
-            from huggingface_hub import get_token
-            hf_token = get_token()
-        except Exception:
-            pass
-
-    if not hf_token:
-        print("[!] ERROR: No Hugging Face token detected! Pass --hf-token or set HF_TOKEN environment variable.")
+        print("[!] ERROR: No Hugging Face token detected!")
+        print("    On Kaggle: add HF_TOKEN to Kaggle Secrets and run Cell 4.")
+        print("    Locally: set HF_TOKEN in .env or run `huggingface-cli login`.")
+        sys.exit(1)
     else:
-        print(f"[+] Hugging Face token detected: {hf_token[:4]}...{hf_token[-4:]}")
+        # Show only prefix+suffix — never the full token
+        print(f"[+] HF token detected: {hf_token[:4]}...{hf_token[-4:]}")
+
+    # Log in so all HF Hub calls in this process are authenticated
+    from huggingface_hub import login as hf_login
+    hf_login(token=hf_token, add_to_git_credential=False)
     hub_repo_id = args.hub_repo_id or os.environ.get("HF_REPO_ID") or c_cfg.get("hub_repo_id")
     if hub_repo_id and "${" in hub_repo_id:
         hub_repo_id = os.environ.get("HF_REPO_ID", None)
@@ -209,6 +285,16 @@ def main():
         except Exception as e:
             print(f"[!] W&B init warning: {e}. Falling back to none.")
             use_wandb = False
+
+    # ── GPU guard: training design requires exactly one GPU ──────────────────
+    # A 4-bit 3B model (~2.5 GB) fits on a single 16 GB T4.  Kaggle T4×2
+    # must still have the model pinned to device 0 — see device_map below.
+    assert torch.cuda.device_count() >= 1, (
+        "No CUDA GPU detected. This script requires at least one GPU. "
+        "On Kaggle: Notebook Settings → Accelerator → GPU T4 x1."
+    )
+    print(f"[+] Detected {torch.cuda.device_count()} CUDA device(s). "
+          "Model will be pinned to device 0 via device_map={'': 0}.")
 
     # 1. Tokenizer
     model_id = m_cfg["base_model"]
@@ -247,13 +333,26 @@ def main():
     )
 
     print(f"[+] Loading base model {model_id} in 4-bit (NF4, compute={compute_dtype})...")
+    # FIX: device_map={"": 0} pins the ENTIRE model to GPU 0.
+    # "auto" shards across all visible GPUs (T4x2 on Kaggle), which breaks
+    # gradient checkpointing and causes "model did not return a loss" at step 0.
     base_model = AutoModelForCausalLM.from_pretrained(
         model_id,
         quantization_config=bnb_config,
-        device_map="auto" if torch.cuda.is_available() else "cpu",
+        device_map={"": 0},           # NOT "auto" — single GPU, no tensor parallelism
+        torch_dtype=torch.float16,
         token=hf_token,
     )
-    base_model = prepare_model_for_kbit_training(base_model)
+
+    # FIX: KV cache is incompatible with gradient checkpointing during training.
+    base_model.config.use_cache = False
+
+    # FIX: Correct kbit setup order — prepare BEFORE get_peft_model.
+    # use_gradient_checkpointing=True was missing in the original.
+    base_model = prepare_model_for_kbit_training(
+        base_model,
+        use_gradient_checkpointing=True,
+    )
 
     # 4. LoRA Configuration
     lora_config = LoraConfig(
@@ -266,6 +365,14 @@ def main():
     )
     model = get_peft_model(base_model, lora_config)
     model.print_trainable_parameters()
+
+    # ── Device tripwire: all parameters must live on exactly one CUDA device ──
+    model_devices = {p.device for p in model.parameters()}
+    assert len(model_devices) == 1, (
+        f"Model parameters are spread across multiple devices: {model_devices}. "
+        "This means device_map={'':0} was not honoured — check accelerate hooks."
+    )
+    print(f"[+] Device tripwire OK — all model parameters on: {model_devices}")
 
     # 5. Data Collator for Completion-Only Loss Masking
     response_template = "<|start_header_id|>assistant<|end_header_id|>\n\n"
@@ -304,6 +411,13 @@ def main():
         hub_model_id=hub_repo_id if push_to_hub else None,
         hub_strategy="every_save" if push_to_hub else "end",
         hub_token=hf_token if push_to_hub else None,
+        # FIX: non-reentrant checkpointing avoids the "inplace op" RuntimeError
+        # that is the second common failure mode with PEFT + grad checkpointing.
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        # FIX: CompletionOnlyDataCollator pre-builds labels; never let Trainer
+        # prune "unused" columns — that removes the labels tensor and causes the
+        # "model did not return a loss" ValueError.
+        remove_unused_columns=False,
     )
 
     import inspect
@@ -350,18 +464,33 @@ def main():
             callbacks=[WandbGPUMonitorCallback(use_wandb=use_wandb)],
         )
 
-    # 7. Check for checkpoint resumption
+    # 7. Check for checkpoint resumption (local dir AND HF Hub)
     resume_checkpoint = None
-    if args.resume or os.path.isdir(output_dir):
+
+    # 7a. Local checkpoints — fastest, avoids re-downloading from Hub
+    if os.path.exists(output_dir):
         checkpoints = [
             os.path.join(output_dir, d)
             for d in os.listdir(output_dir)
             if d.startswith("checkpoint-") and os.path.isdir(os.path.join(output_dir, d))
-        ] if os.path.exists(output_dir) else []
+        ]
         if checkpoints:
             checkpoints.sort(key=lambda x: int(x.split("-")[-1]))
             resume_checkpoint = checkpoints[-1]
-            print(f"[+] Found existing checkpoint: {resume_checkpoint} — resuming training.")
+            print(f"[+] Found local checkpoint: {resume_checkpoint} — resuming from local dir.")
+
+    # 7b. If no local checkpoint, check HF Hub for a previous partial run.
+    #     Handles the case where the prior Kaggle session died after pushing
+    #     ≥1 epoch but before /kaggle/working was snapshotted.
+    if resume_checkpoint is None and (args.resume or hub_repo_id):
+        if resolve_hub_checkpoint(hub_repo_id, hf_token):
+            resume_checkpoint = hub_repo_id
+            print(f"[+] Resuming from HF Hub checkpoint: {resume_checkpoint}")
+
+    if resume_checkpoint:
+        print(f"[+] resume_from_checkpoint = {resume_checkpoint}")
+    else:
+        print("[+] No existing checkpoint found — starting fresh.")
 
     # 8. Train
     t0_train = time.time()
