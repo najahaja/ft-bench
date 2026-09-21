@@ -138,19 +138,24 @@ def resolve_hf_token() -> str:
 
 def resolve_hub_checkpoint(hub_repo_id: str, hf_token: str) -> bool:
     """
-    Return True if the HF Hub repo already has files from a prior run.
-    Used to detect whether a killed Kaggle session pushed at least one epoch.
+    Return True if the HF Hub repo contains a valid training checkpoint.
+    Requires trainer_state.json, adapter_config.json, or a checkpoint-* directory.
     """
     if not hub_repo_id:
         return False
     try:
         from huggingface_hub import list_repo_files
-        files = list(list_repo_files(hub_repo_id, token=hf_token))
-        if files:
-            print(f"[+] HF Hub repo '{hub_repo_id}' has {len(files)} file(s) — prior run detected.")
+        files = set(list_repo_files(hub_repo_id, token=hf_token))
+        checkpoint_indicators = {'trainer_state.json', 'adapter_config.json', 'adapter_model.safetensors'}
+        has_checkpoint = bool(files & checkpoint_indicators) or any('checkpoint-' in f for f in files)
+        if has_checkpoint:
+            print(f'[+] HF Hub repo \'{hub_repo_id}\' has valid checkpoint files.')
             return True
-    except Exception:
-        pass
+        else:
+            print(f'[+] HF Hub repo \'{hub_repo_id}\' exists but contains no checkpoint files (files: {files}). Starting fresh.')
+            return False
+    except Exception as e:
+        print(f'[!] Warning checking Hub checkpoint: {e}')
     return False
 
 
@@ -493,7 +498,7 @@ def main():
     # 7b. If no local checkpoint, check HF Hub for a previous partial run.
     #     Handles the case where the prior Kaggle session died after pushing
     #     ≥1 epoch but before /kaggle/working was snapshotted.
-    if resume_checkpoint is None and (args.resume or hub_repo_id):
+    if resume_checkpoint is None and args.resume and hub_repo_id:
         if resolve_hub_checkpoint(hub_repo_id, hf_token):
             resume_checkpoint = hub_repo_id
             print(f"[+] Resuming from HF Hub checkpoint: {resume_checkpoint}")
