@@ -272,11 +272,22 @@ def main():
         hub_repo_id = os.environ.get("HF_REPO_ID", None)
 
     wandb_key = os.environ.get("WANDB_API_KEY")
-    use_wandb = bool(wandb_key) and t_cfg.get("report_to") == "wandb"
+    wandb_login_ok = os.environ.get("WANDB_LOGIN_OK") == "true"
+    wandb_disabled = os.environ.get("WANDB_DISABLED", "").lower() in ("true", "1")
+
+    if wandb_disabled:
+        use_wandb = False
+    else:
+        use_wandb = (wandb_login_ok or bool(wandb_key)) and t_cfg.get("report_to") == "wandb"
+
     if use_wandb:
         try:
             import wandb
-            wandb.login(key=wandb_key)
+            if wandb_key and not wandb_login_ok:
+                try:
+                    wandb.login(key=wandb_key)
+                except Exception:
+                    pass
             wandb.init(
                 project="ftbench",
                 name=t_cfg.get("run_name", "qlora-llama3.2-3b"),
@@ -405,7 +416,7 @@ def main():
         save_total_limit=3,
         load_best_model_at_end=t_cfg.get("load_best_model_at_end", True),
         metric_for_best_model=t_cfg.get("metric_for_best_model", "eval_loss"),
-        report_to="wandb" if use_wandb else "none",
+        report_to=["wandb"] if use_wandb else "none",
         run_name=t_cfg.get("run_name", "qlora-llama3.2-3b"),
         push_to_hub=push_to_hub,
         hub_model_id=hub_repo_id if push_to_hub else None,
@@ -505,9 +516,15 @@ def main():
 
     # 10. Save best adapter
     best_adapter_dir = os.path.join(output_dir, "final_adapter")
-    print(f"[+] Saving best adapter to: {best_adapter_dir}")
+    final_dir = os.path.join(output_dir, "final")
+    print(f"[+] Saving best adapter to: {best_adapter_dir}, {output_dir}, and {final_dir}")
     trainer.model.save_pretrained(best_adapter_dir)
     tokenizer.save_pretrained(best_adapter_dir)
+    trainer.model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+    trainer.model.save_pretrained(final_dir)
+    tokenizer.save_pretrained(final_dir)
+    print(f"[+] Final LoRA adapter successfully saved to {output_dir}")
 
     if hub_repo_id:
         try:
@@ -519,7 +536,7 @@ def main():
             print(f"[!] Warning: failed to push adapter to hub: {e}")
 
     # 11. Produce merged FP16 model
-    merged_output_dir = "models/finetuned"
+    merged_output_dir = c_cfg.get("merged_output_dir", "/kaggle/working/models/finetuned" if os.path.exists("/kaggle/working") else "models/finetuned")
     print(f"[+] Freeing training VRAM before merging weights...")
     del trainer
     del model
