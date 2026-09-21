@@ -60,7 +60,7 @@ def load_massive(config: str = "en-US"):
     from datasets import load_dataset
     print(f"[+] Downloading AmazonScience/massive ({config})...")
     try:
-        return load_dataset("AmazonScience/massive", config)
+        return load_dataset("AmazonScience/massive", config, trust_remote_code=True)
     except Exception as e:
         print(f"[+] Direct script loading failed ({e}). Loading official HF parquet conversion...")
         base_url = f"https://huggingface.co/datasets/AmazonScience/massive/resolve/refs%2Fconvert%2Fparquet/{config}"

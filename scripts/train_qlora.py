@@ -69,6 +69,10 @@ class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
         self.ignore_index = ignore_index
 
     def torch_call(self, examples):
+        examples = [
+            {k: v for k, v in ex.items() if k != "text"}
+            for ex in examples
+        ]
         for ex in examples:
             if "labels" not in ex:
                 ex["labels"] = list(ex["input_ids"])
