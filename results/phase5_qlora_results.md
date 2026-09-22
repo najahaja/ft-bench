@@ -1,4 +1,4 @@
-# Phase 5 — QLoRA Fine-Tuning Results
+﻿# Phase 5  QLoRA Fine-Tuning Results
 
 ## Model
 
@@ -39,21 +39,12 @@
 ## Artifacts
 
 ### LoRA Adapter
-
-Hugging Face:
-
-`najahaja/ftbench-qlora-llama3.2-3b-adapter`
+- Hugging Face: [`najahaja/ftbench-qlora-llama3.2-3b-adapter`](https://huggingface.co/najahaja/ftbench-qlora-llama3.2-3b-adapter)
 
 ### Merged FP16 Model
-
-Hugging Face:
-
-`najahaja/ftbench-qlora-llama3.2-3b`
-
-The merged model consists of two SafeTensors shards and can be loaded directly with Transformers.
+- Hugging Face: [`najahaja/ftbench-qlora-llama3.2-3b`](https://huggingface.co/najahaja/ftbench-qlora-llama3.2-3b)
+- Shards: 2 SafeTensors shards (directly loadable with Transformers/vLLM)
 
 ## Status
 
-Phase 5 completed successfully.
-
-The trained adapter and merged FP16 model were successfully uploaded to Hugging Face.
+Phase 5 completed successfully. The trained adapter and merged FP16 model were verified and uploaded to Hugging Face.
