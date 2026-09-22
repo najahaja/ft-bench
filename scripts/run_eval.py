@@ -71,7 +71,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         pipe = pipeline(
             "text-generation", model=model_id, tokenizer=tokenizer,
-            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto" if torch.cuda.is_available() else "cpu",
             max_new_tokens=eval_cfg["max_new_tokens"],
             temperature=eval_cfg["temperature"],
