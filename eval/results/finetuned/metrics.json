@@ -1,0 +1,21 @@
+{
+  "system": "finetuned",
+  "n_samples": 2974,
+  "metrics": {
+    "n": 2974,
+    "json_valid_rate": 100.0,
+    "schema_valid_rate": 99.87,
+    "intent_accuracy": 88.6,
+    "slot_f1": 85.87,
+    "exact_match": 70.95,
+    "latency_p50_ms": 0.0,
+    "latency_p95_ms": 0.0,
+    "mean_latency_ms": 0.0,
+    "throughput_tok_s": 0.0
+  },
+  "intent_accuracy_95ci": {
+    "point": 88.6,
+    "lower": 87.42,
+    "upper": 89.641
+  }
+}

@@ -62,25 +62,51 @@ def main():
             slots = {st: "example" for st in random.sample(slot_types, n_slots)} if slot_types else {}
             return json.dumps({"intent": intent, "slots": slots})
     else:
-        from transformers import AutoTokenizer, pipeline
+        from transformers import AutoTokenizer, AutoModelForCausalLM
         import torch
         with open("configs/serving.yaml") as f:
             serving_cfg = yaml.safe_load(f)["serving"]
         model_key = "finetuned" if args.system == "finetuned" else "awq"
         model_id = serving_cfg["models"][model_key]["id"]
+
         tokenizer = AutoTokenizer.from_pretrained(model_id)
-        pipe = pipeline(
-            "text-generation", model=model_id, tokenizer=tokenizer,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else "cpu",
-            max_new_tokens=eval_cfg["max_new_tokens"],
-            temperature=eval_cfg["temperature"],
-            do_sample=eval_cfg["temperature"] > 0,
-            return_full_text=False,
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+
+        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
+        # Load model explicitly (avoids pipeline + accelerate device_map hook collisions)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            dtype=dtype,
+            device_map={"": 0} if torch.cuda.is_available() else None,
         )
+
+        # Remove any lingering accelerate offload hooks to guarantee clean vanilla forward
+        try:
+            from accelerate.hooks import remove_hook_from_module
+            remove_hook_from_module(model, recurse=True)
+        except Exception:
+            pass
+
+        gen_kwargs = {
+            "max_new_tokens": eval_cfg["max_new_tokens"],
+            "temperature": eval_cfg["temperature"],
+            "do_sample": eval_cfg["temperature"] > 0,
+            "pad_token_id": tokenizer.pad_token_id,
+            "eos_token_id": tokenizer.eos_token_id,
+        }
+
         def generate_fn(prompt: str) -> str:
-            out = pipe(prompt)
-            return out[0]["generated_text"] if out else ""
+            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            prompt_len = inputs["input_ids"].shape[1]
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    **gen_kwargs,
+                )
+            generated_tokens = outputs[0][prompt_len:]
+            return tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
     os.makedirs(output_dir, exist_ok=True)
     records = run_eval(

@@ -14,5 +14,5 @@ serving:
       id: najahaja/ftbench-qlora-llama3.2-3b
       quantization: null
     awq:
-      id: ./checkpoints/llama32_3b_support_awq
+      id: najahaja/ftbench-qlora-llama3.2-3b-awq
       quantization: awq

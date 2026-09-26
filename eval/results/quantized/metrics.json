@@ -1,0 +1,21 @@
+{
+  "system": "awq",
+  "n_samples": 5,
+  "metrics": {
+    "n": 5,
+    "json_valid_rate": 100.0,
+    "schema_valid_rate": 100.0,
+    "intent_accuracy": 0.0,
+    "slot_f1": 40.0,
+    "exact_match": 0.0,
+    "latency_p50_ms": 0.03,
+    "latency_p95_ms": 0.09,
+    "mean_latency_ms": 0.04,
+    "throughput_tok_s": 138095.24
+  },
+  "intent_accuracy_95ci": {
+    "point": 0.0,
+    "lower": 0.0,
+    "upper": 0.0
+  }
+}
