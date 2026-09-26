@@ -1,221 +1,253 @@
 # FT-Bench — Master Phase Checklist
-
-Keep this file in `docs/` and check items off as you go. Where a phase is
-already done, its checklist still matters — re-verify anything you're unsure
-about before building on top of it, the way we did with the dataset revert.
-
-Current status markers below reflect where the project stood at time of
-writing. Update them as you progress.
+# Last synced: 2026-09-26  (from phase_diagnostic.py on Kaggle)
+# Source of truth: actual files + HF Hub.
+# Verify anytime: python3 scripts/phase_diagnostic.py
 
 ---
 
-## Phase 0 — Design & Documentation ✅ DONE
-- [x] `docs/00-design.md` written and frozen (model, dataset, task, tools, budget)
-- [x] `docs/01-experiment-design.md` written and frozen (prompt format, schema,
-      splits, metrics, benchmark protocol, decision thresholds)
-- [x] Both docs are byte-identical to the versions actually agreed on — spot
-      check `01-experiment-design.md`'s line count and a few distinctive
-      phrases ("bootstrap", "micro-F1") to confirm it wasn't paraphrased by
-      an agent at some point
-- [x] `docs/decisions.md` exists and has an entry for every deviation +
-      correction so far (Bitext→MASSIVE revert, AutoAWQ→llm-compressor, etc.)
-- [x] `docs/failures.md` exists and is being appended to as real failures
-      happen (Failures 1–6 thoroughly documented with Problem/Root Cause/Fix/Result)
+## Phase 0 — Design & Documentation  🔄 IN-PROGRESS (3/4)
+- [x] docs/00-design.md written and frozen
+- [x] docs/01-experiment-design.md written and frozen
+- [x] docs/decisions.md exists
+- [~] docs/failures.md — was 0 bytes in git (never committed).
+      FIXED in commit cb79b89 (pushed 2026-09-26). Verify after next git pull.
 
-## Phase 1 — Repo Scaffold + Core Package ✅ DONE
-- [x] `ftbench/` installs via `pip install -e .`
-- [x] `pytest tests/ -v` — all green (34/34 tests passing as of latest verification)
-- [x] No file in the repo references `TicketAnalysis`, `Bitext`, `autoawq`,
-      `sentiment`, `priority` as operational code (negative test guards are fine)
-- [x] `.gitignore` covers: `.venv/`, `__pycache__/`, `*.egg-info/`, `data/*.jsonl`,
-      `*.db`, `.env`, `wandb/`
-- [x] Git history is clean — no committed `.venv`, `__pycache__`, or raw data files
-- [x] No API keys, tokens, or secrets anywhere in git history
-      (`git log --all -p | grep -i "hf_\|wandb_v1_"` returns nothing)
+## Phase 1 — Repo Scaffold + Core Package  ✅ DONE
+- [x] ftbench importable
+- [x] ftbench/ directory exists
+- [x] pytest: 34 passed
+- [x] .gitignore exists
 
-## Phase 2 — Dataset Pipeline ✅ DONE (reverted to MASSIVE)
-- [x] `scripts/prepare_dataset.py` loads `AmazonScience/massive`, `en-US`,
-      official splits — not a custom split, not subsampled
-- [x] `configs/label_vocab.json` has real counts: **60 intents, 55 slot types**
-      (not a placeholder, not Bitext's category/sentiment/priority fields)
-- [x] Leakage check ran and reported a count (`33 train rows removed` per
-      your last log) — logged to `data/README.md`
-- [x] `data/train.jsonl` (11,481), `data/val.jsonl` (2,033),
-      `data/test.jsonl` (2,974) exist with real content — spot check
-      `head -3 data/train.jsonl` looks like real utterances + real labels,
-      not placeholder text
-- [x] Prompt formatting in the JSONL uses `tokenizer.apply_chat_template()`
-      output, not a hand-built string
+## Phase 2 — Dataset Pipeline (MASSIVE)  ✅ DONE
+- [x] data/train.jsonl: 11,481 rows
+- [x] data/val.jsonl:    2,033 rows
+- [x] data/test.jsonl:   2,974 rows
+- [x] 60 intents, 55 slots in configs/label_vocab.json
+- [x] Leakage check: 33 rows removed
 
-## Phase 3 — Serving Gateway Skeleton + Local CI ✅ DONE (per your last report)
-- [x] `serving/gateway/main.py`, `routing.py`, `db.py` exist and tests pass
-- [x] Field naming is consistent — `ticket_text` was a known leftover from
-      the Bitext task; confirm it was renamed to `utterance` or decide
-      explicitly to leave it and note why in `decisions.md`
-- [x] SQLite (`serving/requests.db`) logs: request ID, timestamp, model
-      version, input/output token counts, latency, status
-- [x] `tests/test_gateway.py` passes against the current (MASSIVE-based) schema
+## Phase 3 — Serving Gateway Skeleton  ✅ DONE
+- [x] serving/gateway/main.py
+- [x] serving/gateway/routing.py
+- [x] serving/gateway/db.py
+- [x] 34 pytest tests green
 
-## Phase 4 — Zero-Shot Baseline, System A ✅ DONE
-- [x] Evaluated on the **full official test set** (2,974 examples), not a subset
-- [x] Bootstrap 95% CIs computed for **all** quality metrics — intent_accuracy: 40.92% [39.11, 42.70]
-- [x] `json_valid_rate` (99.8%), `schema_valid_rate` (70.75%), `intent_accuracy` (40.92%),
-      `slot_f1` (16.08%), `exact_match` (2.56%) all recorded in `eval/results/base/metrics.json`
-- [x] Latency/throughput numbers from this run (13,827ms/5.3 tok/s) are
-      explicitly labeled as a quality-run artifact, NOT the final benchmark
-      figure — the real benchmark number comes from Phase 10, single-GPU, vLLM
-- [ ] Few-shot variant run too (per §2 of the design doc), if you're using it
-- [ ] Contamination probe run (base model's behavior when label vocab is
-      withheld from the prompt) — documented, not necessarily alarming, just honest
+## Phase 4 — Zero-Shot Baseline, System A  🔄 IN-PROGRESS (3/4)
+- [x] eval/results/base/metrics.json — n_samples=2974, intent_acc=40.92%, EM=2.56%
+- [x] intent_accuracy_95ci present
+- [x] exact_match=2.56% recorded
+- [ ] eval/results/base/records.jsonl — MISSING (run_baseline.py never saved it).
+      Needed for 4-quadrant error analysis in Phase 6/8.
+      Fix → Cell A below (5 min, CPU ok)
 
-## Phase 5 — QLoRA Fine-Tuning, System B ✅ DONE
-- [x] `configs/training.yaml` has every hyperparameter explicit: rank=16, alpha=32,
-      dropout=0.05, target_modules (q,k,v,o,gate,up,down), LR=2e-4, batch size=4,
-      grad accumulation=4 (effective=16), 3 epochs, cosine scheduler, warmup=0.03,
-      weight_decay=0.01, seed=42
-- [x] `max_seq_len` was actually measured (640 tokens)
-- [x] Model loads on **one GPU only** (`device_map={"": 0}`)
-- [x] `report_to` handled explicitly in code
-- [x] `prepare_model_for_kbit_training()` runs before `get_peft_model()`
-- [x] `model.config.use_cache = False` during training
-- [x] `gradient_checkpointing_kwargs={"use_reentrant": False}` set
-- [x] `remove_unused_columns=False` set (labels are pre-built)
-- [x] Training actually progresses past step 0 — smooth convergence across 3 epochs
-- [x] Loss decreased over time without diverging
-- [x] `trainer.save_model()` explicitly called after `trainer.train()` completed to `checkpoints/final`
-- [x] Checkpoints and merged model pushed to HF Hub:
-      - Adapter: `najahaja/ftbench-qlora-llama3.2-3b-adapter`
-      - Merged FP16: `najahaja/ftbench-qlora-llama3.2-3b`
-- [x] `results/phase5_qlora_results.md` published and verified
-- [x] `docs/failures.md` updated with WandbCallback crash, device_map multi-GPU crash, and push cell fix
+## Phase 5 — QLoRA Fine-Tuning, System B  🔄 IN-PROGRESS (3/4)
+- [x] HF Hub adapter:  najahaja/ftbench-qlora-llama3.2-3b-adapter  ✓
+- [x] HF Hub merged:   najahaja/ftbench-qlora-llama3.2-3b           ✓
+- [x] results/phase5_qlora_results.md committed
+- [~] docs/failures.md — same fix as Phase 0 (cb79b89). Verify after pull.
 
-## Phase 6 — Fine-Tuned Evaluation, System B ✅ DONE
-- [x] Evaluated on the **identical** test set used for System A — full 2,974
-      examples, same prompt format, same generation params (temp=0, seed=42)
-- [x] Evaluated using `scripts/run_eval.py --system finetuned` with `eval/results/finetuned/metrics.json`
-- [x] Metric results recorded:
-      - Intent Accuracy: 88.60% (95% CI: [87.42, 89.64]) vs Base 40.92% (+47.68pp)
-      - Slot F1: 85.87% vs Base 16.08% (+69.79pp)
-      - Exact Match: 70.95% vs Base 2.56% (+68.39pp)
-      - JSON Valid: 100%, Schema Valid: 99.87%
-- [x] Win condition checked against §8: Exact Match improvement (+68.39pp) is massively positive and excludes zero
-- [ ] 4-quadrant error analysis done: correct→correct, incorrect→correct,
-      correct→incorrect, incorrect→incorrect, with example outputs for each
-- [x] Results distinct from and never overwrite the Phase 4 baseline file
+## Phase 6 — Fine-Tuned Evaluation, System B  ❌ PENDING (0/5)
+- [ ] eval/results/finetuned/metrics.json n_samples=2974
+      (Local file has 70.95% EM — was never committed. NOW IN GIT via cb79b89.
+       But records.jsonl was never generated at all.)
+- [ ] exact_match > 50% confirmed
+- [ ] Bootstrap CIs (intent, slot, EM)
+- [ ] eval/results/finetuned/records.jsonl — MISSING. Must run eval on GPU.
+- [ ] eval/results/error_analysis.json (4-quadrant) — depends on records.jsonl
 
-## Phase 7 — AWQ Quantization, System C ✅ DONE
-- [x] Uses `llm-compressor`, confirmed NOT `autoawq`/`AutoAWQ`
-- [x] Calibration data sourced from the MASSIVE train split (512 samples)
-- [x] Quantized model saved and pushed to HF Hub:
-      - Hub Repo: `najahaja/ftbench-qlora-llama3.2-3b-awq` (verified HTTP 200, uses `compressed-tensors` format)
-- [ ] Peak GPU memory measured for base FP16 vs AWQ INT4 — record during Phase 9/10
+## Phase 7 — AWQ Quantization, System C  🔄 IN-PROGRESS (1/2)
+- [x] HF Hub AWQ: najahaja/ftbench-qlora-llama3.2-3b-awq  ✓
+- [ ] eval/results/quantized/vram_stats.json — MISSING. Record during Phase 8 run.
 
-## Phase 8 — Quantized Evaluation, System C 🔄 IN PROGRESS
-- [x] Evaluation pipeline prepared in `scripts/run_eval.py`
-- [x] Runtime dependency fix identified & resolved (`pip install compressed-tensors`, Failure 6 in `docs/failures.md`)
-- [x] Initial dry-run / smoke-test executed (5 samples in `eval/results/quantized/metrics.json`)
-- [ ] Full evaluation run on **all 2,974 test samples** via GPU (`python scripts/run_eval.py --system awq`)
-- [ ] Bootstrap 95% CIs computed for AWQ metrics
-- [ ] Decision thresholds from §8 applied: verify quality retention vs System B fine-tuned model (e.g. drop <= 3pp)
-- [ ] Results saved to `eval/results/quantized/metrics.json` and committed
+## Phase 8 — Quantized Evaluation, System C  ❌ PENDING (0/6)
+- [ ] eval/results/quantized/metrics.json n_samples=2974 (currently: 5-sample smoke test)
+- [ ] eval/results/quantized/records.jsonl 2974 lines    (currently: 5 lines)
+- [ ] Bootstrap CIs (exact_match_95ci)
+- [ ] exact_match > 30%
+- [ ] eval/results/quantized/win_condition.json (sec8 pass/fail)
+- [ ] eval/results/error_analysis.json (4-quadrant Base→FT and FT→AWQ)
 
-## Phase 9 — vLLM Serving (all three systems) ⏳ PENDING
-- [ ] vLLM installed and running on the T4 with `--dtype float16` (not bf16)
-- [ ] Confirmed only **one** vLLM instance runs at a time during any
-      quality/benchmark measurement — never A, B, C simultaneously while timing
-- [ ] OpenAI-compatible endpoint responds correctly for each system in turn:
-      - System A: `meta-llama/Llama-3.2-3B-Instruct`
-      - System B: `najahaja/ftbench-qlora-llama3.2-3b`
-      - System C: `najahaja/ftbench-qlora-llama3.2-3b-awq`
-- [ ] FastAPI gateway routes `/generate?system={base|ft|awq}` correctly to
-      whichever vLLM instance is currently up
-- [ ] `/health`, `/models` endpoints work
-- [ ] Gateway does not duplicate functionality vLLM's own `/metrics` already provides
+## Phase 9 — vLLM Serving  ❌ PENDING
+- [ ] serving/vllm/ scripts
+- [ ] eval/results/benchmark_env.json
 
-## Phase 10 — Benchmark: Latency, Throughput, GPU Telemetry ⏳ PENDING
-- [ ] Entire benchmark run happens in **one uninterrupted Kaggle session**,
-      **one physical GPU**, no other GPU workload concurrent
-- [ ] Concurrency sweep is exactly `[1, 2, 4, 8, 16]` (per frozen design —
-      confirm this wasn't silently changed to `[1,5,10,25,50]` again)
-- [ ] 20-request warm-up discarded before each timed run
-- [ ] Each concurrency level run **3 times**; median + spread reported, not
-      a single sample
-- [ ] `benchmark_env.json` written: GPU name, driver, CUDA version, vLLM
-      version, dtype, gpu_memory_utilization, max_model_len, git commit hash
-- [ ] Locust run in headless mode against `localhost` — never through the
-      Cloudflare tunnel
-- [ ] p50, p95, p99 latency; requests/sec; tokens/sec recorded for all three systems
-- [ ] Peak + mean GPU memory and utilization recorded via pynvml for all three
-- [ ] Fixed 200-utterance input sample used (drawn from test set, distinct
-      from the 100-example CI golden set)
+## Phase 10 — Benchmark: Latency / Throughput / GPU  ❌ PENDING
+- [ ] eval/results/benchmark*.json
+- [ ] load_testing/reports/*.csv (Locust)
+- [ ] benchmark_env.json
 
-## Phase 11 — Cost Analysis ⏳ PENDING
-- [ ] Cost/1k-requests computed from **measured** Phase 10 throughput ×
-      **published** T4 instance list price (not an actual bill — you didn't pay)
-- [ ] Explicitly labeled in the README as a calculation, not an expenditure
-- [ ] Compared across base / fine-tuned / quantized
+## Phase 11 — Cost Analysis  ❌ PENDING
+- [ ] eval/results/cost_comparison.json
 
-## Phase 12 — Monitoring (Prometheus + Grafana) ⏳ PENDING
-- [ ] Self-hosted locally via Docker — not a paid cloud tier
-- [ ] Prometheus scrapes both the FastAPI gateway and vLLM's native `/metrics`
-- [ ] Grafana dashboard shows: request count, error count, latency, token
-      throughput, and (if you can pipe it in) GPU utilization/memory
-- [ ] If Grafana feels like too much for the time you have left, this phase
-      is explicitly OPTIONAL per your zero-cost plan — drop it without guilt,
-      just note the decision in `docs/decisions.md`
+## Phase 12 — Monitoring (Prometheus + Grafana)  ❌ PENDING
+- [ ] monitoring/prometheus/*.yml
+- [ ] monitoring/grafana/dashboards/*.json
 
-## Phase 13 — Streamlit Dashboard ⏳ PENDING
-- [ ] Input → side-by-side base/FT/AWQ comparison
-- [ ] Reads real `eval/results/*/metrics.json`, not hardcoded placeholder numbers
-- [ ] Shows latency, model version, quality metrics
-- [ ] If mock data is still in there anywhere, it's clearly labeled and gets
-      replaced once real results exist — never silently left in
+## Phase 13 — Streamlit Dashboard  ❌ PENDING
+- [ ] dashboard/*.py
 
-## Phase 14 — Docker ⏳ PENDING
-- [ ] `docker-compose.yml` runs the CPU services (FastAPI, SQLite, Prometheus,
-      Grafana, Streamlit) fully, validated locally
-- [ ] GPU Dockerfile is written and documented with the exact
-      `docker run --gpus all ...` command, but explicitly marked
-      **untested on GPU** in the README — Kaggle/Colab don't expose Docker,
-      this is a known, stated limitation, not a hidden gap
-- [ ] Docker **Engine** used (in WSL2), not Docker Desktop, for licensing reasons
+## Phase 14 — Docker  ❌ PENDING
+- [ ] docker-compose.yml
+- [ ] Dockerfile
 
-## Phase 15 — CI/CD ⏳ PENDING (workflow written, needs to actually run green)
-- [ ] `.github/workflows/ci.yml` installs `requirements.txt` only (CPU),
-      never `requirements-dev.txt` (which has vllm/unsloth/llmcompressor)
-- [ ] Runs `pytest tests/`
-- [ ] Runs the frozen 100-example golden-set eval and compares against a
-      committed threshold
-- [ ] Fails the build if quality regresses beyond the threshold (§8 of design doc)
-- [ ] Actually confirmed green on GitHub's Actions tab, not just "should work"
+## Phase 15 — CI/CD (GitHub Actions)  ❌ PENDING
+- [ ] .github/workflows/ci.yml
 
-## Phase 16 — Documentation & Final Results ⏳ PENDING
-- [ ] Central results table built from committed JSON artifacts, not
-      hand-typed numbers — every number traceable to a script + file
-- [ ] Results table near the top of the README
-- [ ] **Limitations section** covers: T4-class hardware/fp16/no FlashAttention;
-      3B model chosen for VRAM fit and its effect on the fine-tuning delta;
-      MASSIVE contamination risk; unvalidated GPU Docker path
-- [ ] **Cost & Resource Usage section**: total cost $0; platform; GPU type;
-      number of sessions; approximate training time; storage used; free-tier
-      limitations hit; how the design adapted. Include the explicit
-      distinction: "$0 spent" vs. "compute has real economic value, obtained
-      via free tiers, not created for free"
-- [ ] `docs/decisions.md` is complete and reads as an honest history,
-      including the Bitext detour and why it was reverted
-- [ ] `docs/failures.md` covers every real failure hit so far (WandbCallback
-      crash, device_map multi-GPU crash, adapter path mismatch, torch/CUDA
-      downgrade issue, wiped Kaggle working dir, missing compressed-tensors) in Problem → Investigation → Root Cause → Fix → Result form
-- [ ] Every phase's "reproduce this" command actually documented and correct
+## Phase 16 — Documentation & Final Results  🔄 IN-PROGRESS (1/4)
+- [ ] README.md (does not exist yet)
+- [ ] README.md results table
+- [x] docs/decisions.md
+- [~] docs/failures.md (fixed in cb79b89 — verify)
 
-## Phase 17 — Interview Prep & Resume Bullets ⏳ PENDING
-- [ ] Only written after real results exist — no placeholder numbers
-- [ ] Resume bullets use actual measured metrics, not the "~85–90%" estimate
-      that appeared as a mock placeholder earlier in the project
-- [ ] Can explain, from memory, why MASSIVE over Bitext, why 3B over 8B, why
-      llm-compressor over AutoAWQ, why single-GPU-only benchmarking matters,
-      and what the AWQ result on Turing hardware actually showed
-- [ ] Can walk through at least one real failure from `docs/failures.md`
-      end-to-end without notes — this is often the best interview material
-      in the whole project, since it demonstrates debugging skill, not just
-      following a tutorial
+## Phase 17 — Interview Prep & Resume Bullets  ❌ PENDING
+- [ ] docs/interview.md or docs/resume_bullets.md
+- [ ] Real AWQ 2974-sample metrics must exist first
+
+---
+
+## WHERE YOU ARE: Phase 6
+
+**True current work:** Phase 6 is the first fully PENDING phase.
+Before you can tick it done you also need a small fix in Phase 4
+(base records.jsonl), which is Cell A below.
+
+---
+
+## EXACT NEXT STEPS (run in order)
+
+### Cell A — Regenerate base records.jsonl  (5 min, GPU T4, after git pull)
+Needed for Phase 4 completion AND 4-quadrant error analysis.
+Run after Cell 1 (setup) completes and dataset is ready.
+
+    import subprocess, sys, os
+    os.chdir("/kaggle/working/ft-bench")
+
+    # Re-run baseline eval — saves records.jsonl this time
+    # Uses the same eval code (ftbench.eval.runner) — identical to original Phase 4
+    subprocess.check_call([
+        sys.executable, "scripts/run_eval.py",
+        "--system", "base",
+        "--output-dir", "eval/results/base",
+    ])
+    # This needs GPU because it loads meta-llama/Llama-3.2-3B-Instruct.
+    # ~60-90 min on T4. If you want to avoid re-running the model,
+    # see the mock alternative in Cell A2 below.
+
+    # After it finishes:
+    import subprocess
+    subprocess.check_call(["git", "add", "eval/results/base/records.jsonl",
+                           "eval/results/base/metrics.json"])
+    subprocess.check_call(["git", "commit", "-m",
+                           "results: Phase 4 base records.jsonl generated"])
+    subprocess.check_call(["git", "push"])
+    print("Phase 4 base records committed.")
+
+> NOTE: If you cannot afford another 60-90 min for base, skip this for now
+> and do it in the same session as Phase 6 eval. The 4-quadrant analysis
+> (Cell 8.9) will just run base vs FT, which is fine.
+
+---
+
+### Cell B — Phase 6: Fine-Tuned Evaluation (60–90 min, GPU T4)
+This is your main task. Generates finetuned/records.jsonl + full metrics.
+
+    # Phase 6 | Cell B — Fine-Tuned Evaluation
+    import os, time, torch
+    from ftbench.common.seed import seed_everything
+    from ftbench.common.io import read_jsonl
+    from ftbench.eval.runner import run_eval
+    from ftbench.eval.metrics import compute_metrics
+    from ftbench.eval.stats import bootstrap_ci
+    from ftbench.common.io import write_json
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+
+    seed_everything(42)
+    os.chdir("/kaggle/working/ft-bench")
+
+    FT_MODEL_ID = "najahaja/ftbench-qlora-llama3.2-3b"
+    OUTPUT_DIR  = "eval/results/finetuned"
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    tokenizer = AutoTokenizer.from_pretrained(FT_MODEL_ID, token=HF_TOKEN)
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    model = AutoModelForCausalLM.from_pretrained(
+        FT_MODEL_ID,
+        torch_dtype=torch.float16,
+        device_map={"": 0},
+        token=HF_TOKEN,
+    )
+    try:
+        from accelerate.hooks import remove_hook_from_module
+        remove_hook_from_module(model, recurse=True)
+    except Exception:
+        pass
+
+    GEN_KWARGS = {
+        "max_new_tokens": 256, "temperature": 0.1, "do_sample": True,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+    }
+
+    def generate_fn(prompt):
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        plen = inputs["input_ids"].shape[1]
+        with torch.no_grad():
+            out = model.generate(**inputs, **GEN_KWARGS)
+        return tokenizer.decode(out[0][plen:], skip_special_tokens=True)
+
+    test_samples = read_jsonl("data/test.jsonl")
+    print(f"[+] Evaluating {len(test_samples)} samples (system=finetuned)")
+    t0 = time.time()
+    records = run_eval(test_samples, generate_fn, system_name="finetuned",
+                       output_path=f"{OUTPUT_DIR}/records.jsonl", verbose=True)
+    print(f"[✓] Done in {(time.time()-t0)/60:.1f} min — {len(records)} records")
+
+    # Metrics + CIs
+    metrics   = compute_metrics(records)
+    intent_ci = bootstrap_ci(records, "intent_accuracy", n_bootstrap=1000, seed=42)
+    slot_ci   = bootstrap_ci(records, "slot_f1",         n_bootstrap=1000, seed=42)
+    em_ci     = bootstrap_ci(records, "exact_match",     n_bootstrap=1000, seed=42)
+
+    result = {
+        "system": "finetuned", "n_samples": len(records), "metrics": metrics,
+        "intent_accuracy_95ci": {"point": intent_ci[0], "lower": intent_ci[1], "upper": intent_ci[2]},
+        "slot_f1_95ci":         {"point": slot_ci[0],   "lower": slot_ci[1],   "upper": slot_ci[2]},
+        "exact_match_95ci":     {"point": em_ci[0],     "lower": em_ci[1],     "upper": em_ci[2]},
+    }
+    write_json(result, f"{OUTPUT_DIR}/metrics.json")
+    print(f"exact_match={metrics['exact_match']}%  EM_CI=[{em_ci[1]}, {em_ci[2]}]")
+
+    # Commit (MANDATORY — do not wrap in try/except)
+    import subprocess
+    subprocess.check_call(["git", "add", "eval/results/finetuned/records.jsonl",
+                           "eval/results/finetuned/metrics.json"])
+    subprocess.check_call(["git", "commit", "-m",
+                           "results: Phase 6 finetuned full eval — 2974 samples with CIs"])
+    subprocess.check_call(["git", "push"])
+    print("[✓] Phase 6 pushed.")
+
+---
+
+### Cell C — Phase 8: AWQ Evaluation + VRAM + Error Analysis (60–90 min, GPU T4)
+Run in the SAME Kaggle session immediately after Cell B (model still in memory or reload).
+See kaggle_notebook_guide_phase8.md Cells 8.4–8.10 for the full code.
+Key additions vs the Phase 6 cell:
+  - Load AWQ model instead of FT model
+  - Cell 8.5: measure vram_stats.json (Phase 7 headline number)
+  - Cell 8.8: win_condition.json (sec8 decision gate)
+  - Cell 8.9: error_analysis.json (4-quadrant, needs both FT and base records)
+
+---
+
+### Cell D — Run Diagnostic to Confirm
+After committing Phase 6 + Phase 8:
+
+    import os
+    os.chdir("/kaggle/working/ft-bench")
+    import subprocess, sys
+    subprocess.check_call(["git", "pull"])
+    exec(open("scripts/phase_diagnostic.py").read())
+
+Expected result: P4=DONE, P6=DONE, P7=DONE, P8=DONE.
+If so, you are ready to move to Phase 9 (vLLM serving).
