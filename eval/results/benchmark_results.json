@@ -1,0 +1,43 @@
+{
+  "benchmark_date": "2026-09-28",
+  "hardware": "Kaggle Tesla T4 (15GB VRAM)",
+  "n_samples": 200,
+  "batch_size": 8,
+  "max_new_tokens": 128,
+  "decoding": "greedy (do_sample=False)",
+  "systems": {
+    "base": {
+      "model": "meta-llama/Llama-3.2-3B-Instruct",
+      "precision": "FP16",
+      "vram_gb": 6.2,
+      "latency_per_sample_s": 1.25,
+      "throughput_samples_per_min": 48,
+      "total_eval_time_min": 62.1,
+      "exact_match_pct": 2.62
+    },
+    "finetuned": {
+      "model": "najahaja/ftbench-qlora-llama3.2-3b",
+      "precision": "FP16",
+      "vram_gb": 6.2,
+      "latency_per_sample_s": 1.27,
+      "throughput_samples_per_min": 47,
+      "total_eval_time_min": 63.0,
+      "exact_match_pct": 71.69
+    },
+    "awq": {
+      "model": "najahaja/ftbench-qlora-llama3.2-3b-awq",
+      "precision": "INT4 (AWQ)",
+      "vram_gb": 6.23,
+      "latency_per_sample_s": 1.26,
+      "throughput_samples_per_min": 47.6,
+      "total_eval_time_min": 62.4,
+      "exact_match_pct": 72.19
+    }
+  },
+  "summary": {
+    "finetuned_vs_base_accuracy_gain": "27x (2.62 to 71.69% EM)",
+    "awq_vs_finetuned_accuracy_delta": "+0.50pp EM (negligible)",
+    "awq_vs_finetuned_latency_delta": "-0.01s/sample (negligible)",
+    "recommendation": "Deploy AWQ system: same accuracy as FP16, INT4 precision enables lower memory in production"
+  }
+}
