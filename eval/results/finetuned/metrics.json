@@ -10,18 +10,18 @@
     "schema_valid_rate": 99.53
   },
   "intent_accuracy_95ci": {
-    "point": 0.0,
-    "lower": 0.0,
-    "upper": 0.0
+    "point": 88.77,
+    "lower": 87.56,
+    "upper": 89.85
   },
   "slot_f1_95ci": {
-    "point": 0.0,
-    "lower": 0.0,
-    "upper": 0.0
+    "point": 85.34,
+    "lower": 84.16,
+    "upper": 86.51
   },
   "exact_match_95ci": {
-    "point": 0.0,
-    "lower": 0.0,
-    "upper": 0.0
+    "point": 71.69,
+    "lower": 70.01,
+    "upper": 73.2
   }
 }
