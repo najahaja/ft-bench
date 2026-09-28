@@ -1,0 +1,7 @@
+{
+  "awq_int4_peak_vram_gb": 6.231,
+  "fp16_reference_vram_gb": 6.2,
+  "vram_reduction_pct": -0.5,
+  "gpu_total_vram_gb": 14.56,
+  "gpu_name": "Tesla T4"
+}

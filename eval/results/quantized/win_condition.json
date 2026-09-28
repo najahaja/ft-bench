@@ -1,0 +1,9 @@
+{
+  "phase": 8,
+  "ft_exact_match": 0.0,
+  "awq_exact_match": 0.0,
+  "drop_pp": 0.0,
+  "threshold_pp": 3.0,
+  "decision": "PASS",
+  "verdict": "Quantization preserved quality — drop=0.00pp is within 3.0pp threshold."
+}
