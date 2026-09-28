@@ -1,0 +1,138 @@
+name: FT-Bench CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Lint + Unit Tests ──────────────────────────────────────
+  test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pytest pytest-cov ruff
+
+      - name: Lint with Ruff
+        run: ruff check ftbench/ scripts/ --select E,F,W --ignore E501
+
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --tb=short \
+            --cov=ftbench --cov-report=term-missing \
+            --cov-fail-under=60
+
+  # ── Smoke Eval (CPU, 5 samples) ────────────────────────────
+  smoke-eval:
+    name: Smoke Eval (5 samples, CPU)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install transformers accelerate
+
+      - name: Run smoke evaluation (mock, no GPU)
+        env:
+          FTBENCH_SMOKE: "1"
+        run: |
+          python scripts/smoke_eval.py --n-samples 5 --system base
+
+      - name: Validate metrics schema
+        run: |
+          python -c "
+          import json, sys
+          m = json.load(open('eval/results/smoke/metrics.json'))
+          required = ['intent_accuracy', 'slot_f1', 'exact_match', 'json_valid_rate']
+          missing = [k for k in required if k not in m.get('metrics', m)]
+          if missing:
+              print(f'FAIL: missing keys {missing}')
+              sys.exit(1)
+          print('PASS: metrics schema valid')
+          "
+
+  # ── Docker Build (no push) ─────────────────────────────────
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ftbench-vllm:ci-test .
+
+      - name: Check image exists
+        run: docker image inspect ftbench-vllm:ci-test
+
+  # ── Results Integrity Check ────────────────────────────────
+  results-check:
+    name: Results Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required results files exist
+        run: |
+          python -c "
+          import os, sys, json
+
+          required = [
+              'eval/results/base/metrics.json',
+              'eval/results/finetuned/metrics.json',
+              'eval/results/quantized/metrics.json',
+          ]
+          failed = False
+          for path in required:
+              if not os.path.exists(path):
+                  print(f'MISSING: {path}')
+                  failed = True
+              else:
+                  m = json.load(open(path))
+                  n = m.get('n_samples', 0)
+                  print(f'OK: {path}  (n_samples={n})')
+                  if n < 100:
+                      print(f'  WARNING: n_samples={n} looks like a smoke test')
+          if failed:
+              sys.exit(1)
+          print('All required result files present.')
+          "
+
+      - name: Check AWQ accuracy retention
+        run: |
+          python -c "
+          import json, sys
+          ft  = json.load(open('eval/results/finetuned/metrics.json'))
+          awq = json.load(open('eval/results/quantized/metrics.json'))
+          ft_em  = ft.get('metrics', ft).get('exact_match', 0)
+          awq_em = awq.get('metrics', awq).get('exact_match', 0)
+          drop = ft_em - awq_em
+          print(f'FT EM={ft_em:.2f}%  AWQ EM={awq_em:.2f}%  Drop={drop:.2f}pp')
+          if drop > 5.0:
+              print(f'FAIL: AWQ accuracy drop {drop:.2f}pp exceeds 5pp threshold')
+              sys.exit(1)
+          print(f'PASS: AWQ accuracy drop {drop:.2f}pp is within 5pp threshold')
+          "

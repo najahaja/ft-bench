@@ -1,0 +1,27 @@
+groups:
+  - name: vllm_alerts
+    rules:
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, rate(vllm_request_duration_seconds_bucket[5m])) > 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 latency > 2s"
+          description: "vLLM P99 latency is {{ $value }}s (threshold: 2s)"
+
+      - alert: LowThroughput
+        expr: rate(vllm_requests_total[5m]) < 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Throughput dropped below 5 req/s"
+
+      - alert: GPUMemoryHigh
+        expr: vllm_gpu_memory_used_bytes / vllm_gpu_memory_total_bytes > 0.95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU memory usage > 95%"
