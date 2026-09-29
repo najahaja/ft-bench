@@ -11,19 +11,29 @@ Checks real artifacts on disk + HF Hub. The checklist file can be stale;
 files and HTTP responses cannot.
 """
 
-import json, os, sys, subprocess
+import json
+import os
+import sys
+import subprocess
 from pathlib import Path
 
-GREEN  = "\033[92m"; YELLOW = "\033[93m"; RED = "\033[91m"
-CYAN   = "\033[96m"; RESET  = "\033[0m";  BOLD = "\033[1m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+RED = "\033[91m"
+CYAN = "\033[96m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+
 
 def jsonl_lines(p):
     p = Path(p)
     return sum(1 for _ in open(p)) if p.exists() else 0
 
+
 def load_json(p):
     p = Path(p)
     return json.load(open(p)) if p.exists() else None
+
 
 def hf_exists(model_id, token=None):
     try:
@@ -37,16 +47,18 @@ def hf_exists(model_id, token=None):
     except Exception:
         return False
 
+
 def git_log(n=5):
     try:
-        r = subprocess.run(["git","log",f"-{n}","--oneline"],
+        r = subprocess.run(["git", "log", f"-{n}", "--oneline"],
                            capture_output=True, text=True, check=True)
         return r.stdout.strip().splitlines()
     except Exception:
         return []
 
+
 # Try to get HF token from env or Kaggle secrets
-HF_TOKEN = os.environ.get("HF_TOKEN","")
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
 if not HF_TOKEN:
     try:
         from kaggle_secrets import UserSecretsClient
@@ -56,18 +68,19 @@ if not HF_TOKEN:
 
 results = []
 
+
 def phase(number, name, checks):
-    passed = sum(1 for c,_ in checks if c)
-    total  = len(checks)
+    passed = sum(1 for c, _ in checks if c)
+    total = len(checks)
     if passed == total:
         status = "DONE"
-        badge  = f"{GREEN}OK  Phase {number} -- {name}{RESET}"
+        badge = f"{GREEN}OK  Phase {number} -- {name}{RESET}"
     elif passed == 0:
         status = "PENDING"
-        badge  = f"{RED}X   Phase {number} -- {name}{RESET}"
+        badge = f"{RED}X   Phase {number} -- {name}{RESET}"
     else:
         status = "IN-PROGRESS"
-        badge  = f"{YELLOW}>>  Phase {number} -- {name}  ({passed}/{total}){RESET}"
+        badge = f"{YELLOW}>>  Phase {number} -- {name}  ({passed}/{total}){RESET}"
     lines = [badge]
     for cond, ev in checks:
         mark = "[OK]" if cond else "[X] "
@@ -92,18 +105,20 @@ print(phase(0, "Design & Documentation", [
 
 # ── Phase 1 ──
 try:
-    import ftbench; ftbench_ok = True
+    import ftbench
+    ftbench_ok = True
 except ImportError:
     ftbench_ok = False
 
 try:
     r = subprocess.run(
-        [sys.executable,"-m","pytest","tests/","-q","--tb=no","--no-header"],
+        [sys.executable, "-m", "pytest", "tests/", "-q", "--tb=no", "--no-header"],
         capture_output=True, text=True, timeout=60)
-    pytest_ok  = "passed" in r.stdout and "failed" not in r.stdout
+    pytest_ok = "passed" in r.stdout and "failed" not in r.stdout
     pytest_sum = (r.stdout.strip().splitlines() or ["no output"])[-1]
 except Exception as e:
-    pytest_ok = False; pytest_sum = str(e)
+    pytest_ok = False
+    pytest_sum = str(e)
 
 print(phase(1, "Repo Scaffold + Core Package", [
     (ftbench_ok,              "ftbench importable: " + str(ftbench_ok)),
@@ -117,8 +132,8 @@ train_n = jsonl_lines("data/train.jsonl")
 val_n   = jsonl_lines("data/val.jsonl")
 test_n  = jsonl_lines("data/test.jsonl")
 vocab   = load_json("configs/label_vocab.json") or {}
-n_int   = len(vocab.get("intents",[]))
-n_sl    = len(vocab.get("slots",[]))
+n_int   = len(vocab.get("intents", []))
+n_sl    = len(vocab.get("slots", []))
 
 print(phase(2, "Dataset Pipeline (MASSIVE)", [
     (train_n == 11481, "data/train.jsonl: " + str(train_n) + " (expected 11481)"),
@@ -298,15 +313,18 @@ print(f"{'Phase':<8} {'Name':<40} {'Status':<13} Checks")
 print("-"*65)
 
 for num, name, status, passed, total in results:
-    if   status == "DONE":        badge = f"{GREEN}DONE       {RESET}"
-    elif status == "IN-PROGRESS": badge = f"{YELLOW}IN-PROGRESS{RESET}"
-    else:                         badge = f"{RED}PENDING    {RESET}"
+    if status == "DONE":
+        badge = f"{GREEN}DONE       {RESET}"
+    elif status == "IN-PROGRESS":
+        badge = f"{YELLOW}IN-PROGRESS{RESET}"
+    else:
+        badge = f"{RED}PENDING    {RESET}"
     print(f"  P{num:<6} {name:<40} {badge}  {passed}/{total}")
 
 print()
-first_nd = next((num for num,_,st,_,_ in results if st != "DONE"), None)
+first_nd = next((num for num, _, st, _, _ in results if st != "DONE"), None)
 if first_nd is not None:
-    nm = next(n for p,n,_,_,_ in results if p == first_nd)
+    nm = next(n for p, n, _, _, _ in results if p == first_nd)
     print(f"{BOLD}{CYAN}You are in: Phase {first_nd} -- {nm}{RESET}")
 else:
     print(f"{BOLD}{GREEN}All phases complete!{RESET}")
