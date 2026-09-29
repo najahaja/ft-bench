@@ -237,7 +237,7 @@ AWQ reduces inference cost by roughly 40% while preserving accuracy.
 
 ## License
 
-Copyright © 2026 najahaja. All rights reserved.
+Copyright © 2026 Ahamed Najah [@najahaja](https://github.com/najahaja) All rights reserved.
 
 ---
 
