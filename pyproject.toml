@@ -7,7 +7,24 @@ name = "ftbench"
 version = "0.1.0"
 description = "Open-Weight LLM Fine-Tuning and Optimized Serving Benchmark"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.24.0",
+    "numpy>=1.24.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "httpx>=0.24.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
