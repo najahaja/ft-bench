@@ -44,7 +44,7 @@ def merge_and_save(
         print(f"[+] Pushing merged model to HF Hub: {hub_repo_id}...")
         merged_model.push_to_hub(hub_repo_id, token=hf_token, safe_serialization=True)
         tokenizer.push_to_hub(hub_repo_id, token=hf_token)
-        print(f"[✓] Pushed to HF Hub: {hub_repo_id}")
+        print("[✓] Pushed to HF Hub:" + hub_repo_id)
 
 
 def main():

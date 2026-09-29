@@ -39,6 +39,7 @@ except Exception:
 
 from transformers import DataCollatorForSeq2Seq
 
+
 class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
     """
     Robust completion-only loss collator.
@@ -86,6 +87,7 @@ class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
                     break
         return batch
 
+
 try:
     from trl import SFTConfig
 except ImportError:
@@ -96,7 +98,6 @@ from ftbench.common.io import read_jsonl, write_json
 from ftbench.common.seed import seed_everything
 from ftbench.prompts.templates import build_training_prompt
 from scripts.merge_adapter import merge_and_save
-
 
 
 def resolve_hf_token() -> str:
@@ -262,7 +263,7 @@ def main():
 
     seed_everything(t_cfg.get("seed", 42))
 
-    # ── Security: resolve HF token from Kaggle Secrets / env only ────────────
+    # ── Security: resolve HF token from Kaggle Secrets / env only ──
     hf_token = resolve_hf_token()
     if not hf_token:
         print("[!] ERROR: No Hugging Face token detected!")
@@ -306,7 +307,7 @@ def main():
             print(f"[!] W&B init warning: {e}. Falling back to none.")
             use_wandb = False
 
-    # ── GPU guard: training design requires exactly one GPU ──────────────────
+    # ── GPU guard: training design requires exactly one GPU ──
     # A 4-bit 3B model (~2.5 GB) fits on a single 16 GB T4.  Kaggle T4×2
     # must still have the model pinned to device 0 — see device_map below.
     assert torch.cuda.device_count() >= 1, (
@@ -338,7 +339,7 @@ def main():
     with open(vocab_path) as f:
         label_vocab = json.load(f)
 
-    print(f"[+] Formatting datasets using canonical build_training_prompt()...")
+    print("[+] Formatting datasets using canonical build_training_prompt()...")
     train_dataset = prepare_hf_dataset(train_path, tokenizer, label_vocab)
     val_dataset = prepare_hf_dataset(d_cfg.get("val_path", "data/val.jsonl"), tokenizer, label_vocab)
     print(f"[+] Train dataset: {len(train_dataset)} examples | Val dataset: {len(val_dataset)} examples")
@@ -353,7 +354,7 @@ def main():
     )
 
     print(f"[+] Loading base model {model_id} in 4-bit (NF4, compute={compute_dtype})...")
-    # FIX: device_map={"": 0} pins the ENTIRE model to GPU 0.
+    # FIX: device_map={"":0} pins the ENTIRE model to GPU 0.
     # "auto" shards across all visible GPUs (T4x2 on Kaggle), which breaks
     # gradient checkpointing and causes "model did not return a loss" at step 0.
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -414,7 +415,7 @@ def main():
         gradient_accumulation_steps=t_cfg.get("gradient_accumulation_steps", 4),
         learning_rate=float(t_cfg.get("learning_rate", 2e-4)),
         lr_scheduler_type=t_cfg.get("lr_scheduler_type", "cosine"),
-        warmup_steps=max(1, int((len(train_dataset) // (t_cfg.get("per_device_train_batch_size", 4) * t_cfg.get("gradient_accumulation_steps", 4))) * t_cfg.get("num_train_epochs", 3) * float(t_cfg.get("warmup_ratio", 0.03)))),
+        warmup_steps=max(1, int((len(train_dataset) // (t_cfg.get("per_device_train_batch_size", 4) * t_cfg.get("gradient_accumulation_steps", 4))) * t_cfg.get("num_train_epochs", 3) * float(t_cfg.get("warmup_ratio", 0.1)))),
         weight_decay=float(t_cfg.get("weight_decay", 0.01)),
         max_grad_norm=float(t_cfg.get("max_grad_norm", 0.3)),
         fp16=t_cfg.get("fp16", True),
@@ -540,13 +541,13 @@ def main():
             print(f"[+] Pushing final adapter to HF Hub: {hub_repo_id}...")
             trainer.model.push_to_hub(hub_repo_id, token=hf_token)
             tokenizer.push_to_hub(hub_repo_id, token=hf_token)
-            print(f"[✓] Final adapter pushed to HF Hub.")
+            print("[✓] Final adapter pushed to HF Hub.")
         except Exception as e:
             print(f"[!] Warning: failed to push adapter to hub: {e}")
 
     # 11. Produce merged FP16 model
     merged_output_dir = c_cfg.get("merged_output_dir", "/kaggle/working/models/finetuned" if os.path.exists("/kaggle/working") else "models/finetuned")
-    print(f"[+] Freeing training VRAM before merging weights...")
+    print("[+] Freeing training VRAM before merging weights...")
     del trainer
     del model
     del base_model
@@ -555,7 +556,7 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    print(f"[+] Merging adapter into base model (FP16)...")
+    print("[+] Merging adapter into base model (FP16)...")
     try:
         merge_and_save(
             base_model_id=model_id,
