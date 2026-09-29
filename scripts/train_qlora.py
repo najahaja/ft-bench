@@ -7,14 +7,11 @@ and docs/01-experiment-design.md.
 """
 import argparse
 import copy
-import gc
-import inspect
 import json
 import os
 import subprocess
 import sys
 import time
-from typing import Dict, Any, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,13 +22,11 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    DataCollatorForLanguageModeling,
     TrainerCallback,
     TrainingArguments,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer
-from transformers import DataCollatorForSeq2Seq
 
 # Workaround for upstream TRL bug where _patch_chunked_ce_lm_head crashes on functools.partial
 try:
@@ -40,17 +35,7 @@ try:
 except Exception:
     pass
 
-try:
-    from trl import SFTConfig
-except ImportError:
-    SFTConfig = None
-
-from ftbench.common.gpu import get_gpu_stats, peak_vram_mb
-from ftbench.common.io import read_jsonl, write_json
-from ftbench.common.seed import seed_everything
-from ftbench.prompts.templates import build_training_prompt
-from scripts.merge_adapter import merge_and_save
-
+from transformers import DataCollatorForSeq2Seq
 
 class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
     """
@@ -98,6 +83,18 @@ class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
                     labels[: j + r_len] = self.ignore_index
                     break
         return batch
+
+try:
+    from trl import SFTConfig
+except ImportError:
+    SFTConfig = None
+
+from ftbench.common.gpu import get_gpu_stats, peak_vram_mb  # noqa: E402
+from ftbench.common.io import read_jsonl, write_json  # noqa: E402
+from ftbench.common.seed import seed_everything  # noqa: E402
+from ftbench.prompts.templates import build_training_prompt  # noqa: E402
+from scripts.merge_adapter import merge_and_save  # noqa: E402
+
 
 
 def resolve_hf_token() -> str:
@@ -354,7 +351,7 @@ def main():
     )
 
     print(f"[+] Loading base model {model_id} in 4-bit (NF4, compute={compute_dtype})...")
-    # FIX: device_map={"":0} pins the ENTIRE model to GPU 0.
+    # FIX: device_map={"": 0} pins the ENTIRE model to GPU 0.
     # "auto" shards across all visible GPUs (T4x2 on Kaggle), which breaks
     # gradient checkpointing and causes "model did not return a loss" at step 0.
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -415,7 +412,7 @@ def main():
         gradient_accumulation_steps=t_cfg.get("gradient_accumulation_steps", 4),
         learning_rate=float(t_cfg.get("learning_rate", 2e-4)),
         lr_scheduler_type=t_cfg.get("lr_scheduler_type", "cosine"),
-        warmup_steps=max(1, int((len(train_dataset) // (t_cfg.get("per_device_train_batch_size", 4) * t_cfg.get("gradient_accumulation_steps", 4))) * t_cfg.get("num_train_epochs", 3) * float(t_cfg.get("warmup_ratio", 0.1)))),
+        warmup_steps=max(1, int((len(train_dataset) // (t_cfg.get("per_device_train_batch_size", 4) * t_cfg.get("gradient_accumulation_steps", 4))) * t_cfg.get("num_train_epochs", 3) * float(t_cfg.get("warmup_ratio", 0.03)))),
         weight_decay=float(t_cfg.get("weight_decay", 0.01)),
         max_grad_norm=float(t_cfg.get("max_grad_norm", 0.3)),
         fp16=t_cfg.get("fp16", True),
@@ -441,6 +438,7 @@ def main():
         remove_unused_columns=False,
     )
 
+    import inspect
     max_len = t_cfg.get("max_seq_len", 640)
 
     if SFTConfig is not None:
@@ -550,6 +548,7 @@ def main():
     del trainer
     del model
     del base_model
+    import gc
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

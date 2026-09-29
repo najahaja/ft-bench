@@ -6,7 +6,6 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from ftbench.data.schema import validate_output
-from ftbench.eval.metrics import compute_metrics
 from ftbench.eval.parse import parse_output
 from ftbench.prompts.templates import build_inference_prompt
 

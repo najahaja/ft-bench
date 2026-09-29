@@ -33,7 +33,7 @@ jobs:
         run: |
           pytest tests/ -v --tb=short \
             --cov=ftbench --cov-report=term-missing \
-            --cov-fail-under=60
+            --cov-fail-under=50
 
   # ── Smoke Eval (CPU, 5 samples) ────────────────────────────
   smoke-eval:

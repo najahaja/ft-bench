@@ -2,7 +2,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, List
 
 
 def read_jsonl(path) -> List[Dict[str, Any]]:

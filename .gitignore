@@ -9,3 +9,7 @@ data/val.jsonl
 data/test.jsonl
 .env
 *.db
+
+.coverage
+.pytest_cache/
+eval/results/smoke/

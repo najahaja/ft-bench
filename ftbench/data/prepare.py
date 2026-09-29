@@ -5,7 +5,6 @@ Uses the OFFICIAL train/validation/test splits from AmazonScience/massive.
 Does NOT re-split. Performs a leakage check and logs results to data/README.md.
 """
 import hashlib
-import json
 import os
 from typing import Dict, List, Optional, Tuple
 

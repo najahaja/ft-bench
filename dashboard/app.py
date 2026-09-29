@@ -1,6 +1,8 @@
 """
 FT-Bench: Enterprise Executive Dashboard
 End-to-End LLM Fine-Tuning and Quantization Benchmark
+Author: Ahamed Najah (@najahaja)
+Copyright (c) 2026 Ahamed Najah. All Rights Reserved.
 Run: streamlit run dashboard/app.py
 """
 import streamlit as st
@@ -77,6 +79,62 @@ st.markdown("""
     .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
     .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
     .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+    
+    .author-card {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        border-radius: 14px;
+        padding: 18px;
+        margin-top: 22px;
+        margin-bottom: 22px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .author-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #818cf8;
+        letter-spacing: 0.08em;
+    }
+    .author-name {
+        font-size: 1.12rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-top: 2px;
+    }
+    .author-handle {
+        font-size: 0.85rem;
+        color: #38bdf8;
+        font-weight: 500;
+    }
+    .author-license {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.76rem;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .license-badge {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.72rem;
+    }
+    .footer-box {
+        margin-top: 50px;
+        padding: 28px 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.6) 100%);
+        border-radius: 16px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,7 +171,21 @@ data = load_all_data()
 # ── Sidebar Navigation & Info ──────────────────────────────────
 with st.sidebar:
     st.image("https://img.shields.io/badge/FT--Bench-Llama--3.2--3B-blue?style=for-the-badge&logo=meta", use_container_width=True)
-    st.markdown("### 🛠️ Experiment Config")
+    st.markdown('<div style="height: 12px;"></div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="author-card">
+        <div class="author-label">Lead AI Engineer & Author</div>
+        <div class="author-name">Ahamed Najah</div>
+        <div class="author-handle"><a href="https://github.com/najahaja" target="_blank" style="color: #38bdf8; text-decoration: none;">@najahaja</a></div>
+        <div class="author-license">
+            <span>Copyright Status:</span>
+            <span class="license-badge">All Rights Reserved</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### ⚙️ Experiment Config")
     st.markdown("""
     - **Base Model:** `Llama-3.2-3B-Instruct`
     - **Fine-Tuning:** QLoRA (r=16, $\\alpha=32$)
@@ -130,18 +202,19 @@ with st.sidebar:
     - [AWQ Quantized Model (HF)](https://huggingface.co/najahaja/ftbench-qlora-llama3.2-3b-awq)
     """)
     st.divider()
-    st.caption("FT-Bench v1.0.0 · Production Portfolio Edition")
+    st.caption("FT-Bench v1.0.0 • © 2026 Ahamed Najah • All Rights Reserved")
 
 # ── Header & Badges ────────────────────────────────────────────
 col_h1, col_h2 = st.columns([0.7, 0.3])
 with col_h1:
     st.title("⚡ FT-Bench: LLM Fine-Tuning & Quantization")
     st.markdown("""
-    <div style="margin-bottom: 15px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; margin-bottom: 22px;">
         <span class="badge-pill badge-blue">Llama-3.2-3B</span>
         <span class="badge-pill badge-green">QLoRA Fine-Tuned</span>
         <span class="badge-pill badge-purple">AWQ 4-Bit Quantized</span>
         <span class="badge-pill badge-blue">vLLM Serving</span>
+        <span class="badge-pill badge-amber" style="margin-left: 6px;">Proprietary • All Rights Reserved</span>
     </div>
     """, unsafe_allow_html=True)
     st.markdown(
@@ -581,18 +654,41 @@ with tab_playground:
             "slots": slots
         }
         
-        col_out1, col_out2 = st.columns(2)
+        col_out1, col_out2 = st.columns([0.55, 0.45])
         with col_out1:
+            st.markdown("##### 📄 Structured JSON Payload")
             st.json(mock_out)
         with col_out2:
-            st.success("✅ **JSON Schema Valid: 100%**")
-            st.info(f"🎯 **Predicted Intent:** `{intent}`")
-            st.info(f"🏷️ **Extracted Slots:** {len(slots)} entities captured")
+            st.markdown("##### ⚡ Live Execution Metrics (This Query)")
+            st.success("✅ **JSON Schema Validation:** 100% Valid")
+            st.info(f"🎯 **Detected Intent:** `{intent}`")
+            st.info(f"🏷️ **Extracted Entities (Slots):** {len(slots)} found")
+            
+            # Additional Per-Query Performance Telemetry
+            st.markdown(f"""
+            <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px; margin-top: 10px;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 600;">Execution Telemetry</div>
+                <div style="font-size: 0.85rem; color: #e2e8f0; margin-top: 4px;">• Engine: <strong>vLLM AWQ INT4</strong></div>
+                <div style="font-size: 0.85rem; color: #e2e8f0;">• Simulated Latency: <strong style="color: #10b981;">32.4 ms</strong></div>
+                <div style="font-size: 0.85rem; color: #e2e8f0;">• Input Token Count: <strong>{len(custom_query.split()) + 4} tokens</strong></div>
+            </div>
+            """, unsafe_allow_html=True)
 
-st.divider()
-st.markdown(
-    "<div style='text-align: center; color: #64748b; font-size: 0.85rem;'>"
-    "FT-Bench: QLoRA Fine-Tuning vs. AWQ Quantization Benchmark · Built by Najah · Open Source on GitHub"
-    "</div>",
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div class="footer-box">
+    <div style="font-weight: 800; color: #ffffff; font-size: 1.05rem; letter-spacing: 0.02em; margin-bottom: 8px;">
+        FT-Bench: Enterprise LLM Fine-Tuning & Quantization Benchmark Platform
+    </div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 12px; text-shadow: 0 0 12px rgba(56, 189, 248, 0.2);">
+        <span style="color: #94a3b8; font-weight: 600;">Architected & Developed by</span> 
+        <strong style="color: #38bdf8; font-weight: 800;">Ahamed Najah</strong> 
+        (<a href="https://github.com/najahaja" target="_blank" style="color: #818cf8; text-decoration: underline; font-weight: 700;">@najahaja</a>)
+    </div>
+    <div style="display: inline-block; padding: 6px 18px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 9999px; color: #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 12px;">
+        © 2026 Ahamed Najah (@najahaja). All Rights Reserved.
+    </div>
+    <div style="font-size: 0.8rem; color: #cbd5e1; max-width: 720px; margin: 0 auto; line-height: 1.6;">
+        Proprietary software and benchmark assets. Unauthorized duplication, modification, re-distribution, or commercial deployment without prior written permission is strictly prohibited.
+    </div>
+</div>
+""", unsafe_allow_html=True)

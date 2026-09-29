@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-import argparse, json, os, sys
+import argparse
+import json
+import os
+import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import yaml
 from ftbench.common.io import read_json
