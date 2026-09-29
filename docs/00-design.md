@@ -12,7 +12,7 @@ merged.
 - **Model:** `meta-llama/Llama-3.2-3B-Instruct`
 - **Dataset:** `AmazonScience/massive`, config `en-US`, OFFICIAL splits only.
   Do not create a custom split. Do not use Bitext or any other dataset.
-- **License:** CC-BY-4.0
+- **License:** All Rights Reserved — © 2026 Ahamed Najah (@najahaja). Unauthorized reproduction, modification, distribution, or commercial use is strictly prohibited without prior written permission.
 - **Task:** constrained NLU parsing — utterance -> {"intent": ..., "slots": {...}}
   - `intent`: one of 60 labels, extracted programmatically from the dataset
   - `slots`: keys from 55 slot types, extracted programmatically from the dataset

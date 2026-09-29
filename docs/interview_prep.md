@@ -36,6 +36,8 @@
   reproducible evaluation code and full experiment documentation
 - Implemented **GitHub Actions CI** with lint, smoke eval, Docker build,
   and automated AWQ accuracy regression gate (< 5 pp drop = pass)
+- Deployed an **interactive Streamlit dashboard** to Streamlit Cloud for live demo and result exploration
+  — **Live at https://ft-bench.streamlit.app/**
 - Built robust batched inference with **checkpoint/resume logic**
   (reduced eval time from 18+ hours to ~3.5 hours on T4)
 

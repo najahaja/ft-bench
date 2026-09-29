@@ -82,8 +82,8 @@
 - [ ] monitoring/prometheus/*.yml
 - [ ] monitoring/grafana/dashboards/*.json
 
-## Phase 13 — Streamlit Dashboard  ❌ PENDING
-- [ ] dashboard/*.py
+## Phase 13 — Streamlit Dashboard  ✅ DONE
+- [x] dashboard/app.py  ✅ Live at https://ft-bench.streamlit.app/
 
 ## Phase 14 — Docker  ❌ PENDING
 - [ ] docker-compose.yml
@@ -92,9 +92,9 @@
 ## Phase 15 — CI/CD (GitHub Actions)  ❌ PENDING
 - [ ] .github/workflows/ci.yml
 
-## Phase 16 — Documentation & Final Results  🔄 IN-PROGRESS (1/4)
-- [ ] README.md (does not exist yet)
-- [ ] README.md results table
+## Phase 16 — Documentation & Final Results  🔄 IN-PROGRESS (3/5)
+- [x] README.md — complete with results table, badge, Streamlit link
+- [x] README.md results table
 - [x] docs/decisions.md
 - [~] docs/failures.md (fixed in cb79b89 — verify)
 
