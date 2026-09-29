@@ -1,5 +1,4 @@
-"""
-Smoke evaluation for CI — runs 5 samples without a GPU using mock generation.
+"""Smoke evaluation for CI — runs 5 samples without a GPU using mock generation.
 Usage: python scripts/smoke_eval.py --n-samples 5 --system base
 """
 import argparse
@@ -7,6 +6,7 @@ import os
 import random
 from ftbench.common.io import read_jsonl, write_json
 from ftbench.eval.metrics import compute_metrics
+
 
 def mock_generate(prompt: str) -> str:
     """Return a plausible but random JSON output for smoke testing."""
@@ -17,6 +17,7 @@ def mock_generate(prompt: str) -> str:
     ]
     return random.choice(templates)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-samples", type=int, default=5)
@@ -26,13 +27,25 @@ def main():
     out_dir = "eval/results/smoke"
     os.makedirs(out_dir, exist_ok=True)
 
-    samples = read_jsonl("data/test.jsonl")[: args.n_samples]
+    test_path = "data/test.jsonl"
+    if os.path.exists(test_path):
+        samples = read_jsonl(test_path)[: args.n_samples]
+    else:
+        # Fallback samples for CI environments where data/test.jsonl is not checked into git
+        samples = [
+            {"id": "smoke_0", "utterance": "book a flight from boston to denver", "ground_truth": {"intent": "atis_flight", "slots": {"fromloc.city_name": "boston", "toloc.city_name": "denver"}}},
+            {"id": "smoke_1", "utterance": "what is the airfare from new york", "ground_truth": {"intent": "atis_airfare", "slots": {"fromloc.city_name": "new york"}}},
+            {"id": "smoke_2", "utterance": "show ground transportation in dallas", "ground_truth": {"intent": "atis_ground_service", "slots": {}}},
+            {"id": "smoke_3", "utterance": "flights from atlanta to seattle", "ground_truth": {"intent": "atis_flight", "slots": {"fromloc.city_name": "atlanta", "toloc.city_name": "seattle"}}},
+            {"id": "smoke_4", "utterance": "tell me ground transportation", "ground_truth": {"intent": "atis_ground_service", "slots": {}}},
+        ][: args.n_samples]
+
     records = []
     for s in samples:
         from ftbench.prompts.templates import build_inference_prompt
         from ftbench.eval.parse import parse_output
         prompt = build_inference_prompt(s["utterance"])
-        raw    = mock_generate(prompt)
+        raw = mock_generate(prompt)
         parsed = parse_output(raw)
         records.append({
             "id": s.get("id", ""),
@@ -47,6 +60,7 @@ def main():
     write_json({"system": args.system, "n_samples": len(records), "metrics": metrics},
                f"{out_dir}/metrics.json")
     print(f"[smoke] n={len(records)} metrics={metrics}")
+
 
 if __name__ == "__main__":
     main()
