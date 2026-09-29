@@ -11,7 +11,7 @@
 > pushed it to 71.69% — a 27× improvement. I then applied AWQ 4-bit quantization,
 > which preserved 100% of accuracy (72.19% EM) while cutting inference cost by 40%.
 > The full pipeline includes evaluation harness with bootstrap CI, 4-quadrant error analysis,
-> HuggingFace model publishing, GitHub Actions CI, and full documentation — all open source."
+> HuggingFace model publishing, GitHub Actions CI, interactive Streamlit Cloud dashboard (https://ft-bench.streamlit.app/), and full documentation."
 
 ---
 

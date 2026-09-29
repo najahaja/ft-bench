@@ -197,6 +197,7 @@ with st.sidebar:
     st.divider()
     st.markdown("### 🔗 Project Links")
     st.markdown("""
+    - [🌐 Live Web App (Streamlit)](https://ft-bench.streamlit.app/)
     - [GitHub Repository](https://github.com/najahaja/ft-bench)
     - [Fine-Tuned Model (HF)](https://huggingface.co/najahaja/ftbench-qlora-llama3.2-3b)
     - [AWQ Quantized Model (HF)](https://huggingface.co/najahaja/ftbench-qlora-llama3.2-3b-awq)

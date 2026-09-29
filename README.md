@@ -7,6 +7,7 @@
 [![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/)
 [![Model](https://img.shields.io/badge/model-Llama--3.2--3B--Instruct-orange)](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)
 [![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](#-license)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ft-bench.streamlit.app/)
 
 ---
 
