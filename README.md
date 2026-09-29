@@ -246,7 +246,7 @@ Copyright © 2026 najahaja. All rights reserved.
 If you like this project, please give it a star ⭐
 
 - GitHub: [@najahaja](https://github.com/najahaja)
-- LinkedIn: [najahaja](https://www.linkedin.com/in/najahaja)
+- LinkedIn: [najahaja](https://www.linkedin.com/in/ahamednajah)
 
 ---
 
