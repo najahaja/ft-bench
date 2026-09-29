@@ -5,7 +5,7 @@
 [![CI](https://github.com/najahaja/ft-bench/actions/workflows/ci.yml/badge.svg)](https://github.com/najahaja/ft-bench/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/)
 [![Model](https://img.shields.io/badge/model-Llama--3.2--3B--Instruct-orange)](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)
-[![Copyright](https://img.shields.io/badge/copyright-2026-najahaja-lightgrey)](https://github.com/najahaja)
+[![Copyright](https://img.shields.io/badge/copyright-%C2%A9%202026%20najahaja-lightgrey)](https://github.com/najahaja)
 
 ---
 
