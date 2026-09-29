@@ -7,6 +7,8 @@ and docs/01-experiment-design.md.
 """
 import argparse
 import copy
+import gc
+import inspect
 import json
 import os
 import subprocess
@@ -29,6 +31,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer
+from transformers import DataCollatorForSeq2Seq
 
 # Workaround for upstream TRL bug where _patch_chunked_ce_lm_head crashes on functools.partial
 try:
@@ -37,7 +40,16 @@ try:
 except Exception:
     pass
 
-from transformers import DataCollatorForSeq2Seq
+try:
+    from trl import SFTConfig
+except ImportError:
+    SFTConfig = None
+
+from ftbench.common.gpu import get_gpu_stats, peak_vram_mb
+from ftbench.common.io import read_jsonl, write_json
+from ftbench.common.seed import seed_everything
+from ftbench.prompts.templates import build_training_prompt
+from scripts.merge_adapter import merge_and_save
 
 
 class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
@@ -86,18 +98,6 @@ class CompletionOnlyDataCollator(DataCollatorForSeq2Seq):
                     labels[: j + r_len] = self.ignore_index
                     break
         return batch
-
-
-try:
-    from trl import SFTConfig
-except ImportError:
-    SFTConfig = None
-
-from ftbench.common.gpu import get_gpu_stats, peak_vram_mb
-from ftbench.common.io import read_jsonl, write_json
-from ftbench.common.seed import seed_everything
-from ftbench.prompts.templates import build_training_prompt
-from scripts.merge_adapter import merge_and_save
 
 
 def resolve_hf_token() -> str:
@@ -263,7 +263,7 @@ def main():
 
     seed_everything(t_cfg.get("seed", 42))
 
-    # ── Security: resolve HF token from Kaggle Secrets / env only ──
+    # ── Security: resolve HF token from Kaggle Secrets / env only ────────────
     hf_token = resolve_hf_token()
     if not hf_token:
         print("[!] ERROR: No Hugging Face token detected!")
@@ -307,7 +307,7 @@ def main():
             print(f"[!] W&B init warning: {e}. Falling back to none.")
             use_wandb = False
 
-    # ── GPU guard: training design requires exactly one GPU ──
+    # ── GPU guard: training design requires exactly one GPU ──────────────────
     # A 4-bit 3B model (~2.5 GB) fits on a single 16 GB T4.  Kaggle T4×2
     # must still have the model pinned to device 0 — see device_map below.
     assert torch.cuda.device_count() >= 1, (
@@ -441,7 +441,6 @@ def main():
         remove_unused_columns=False,
     )
 
-    import inspect
     max_len = t_cfg.get("max_seq_len", 640)
 
     if SFTConfig is not None:
@@ -551,7 +550,6 @@ def main():
     del trainer
     del model
     del base_model
-    import gc
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
